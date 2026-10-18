@@ -1,0 +1,6 @@
+{
+  "name": "CrediPlus - Sistema Integral de Préstamos y Cartera",
+  "description": "Sistema profesional de administración de préstamos con amortización francesa, contratos civiles, cartera activa, créditos vencidos, tipo de cambio, subida de documentos y reportes contables en PDF.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
