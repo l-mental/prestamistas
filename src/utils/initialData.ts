@@ -1,4 +1,4 @@
-import { Client, CompanySettings, ExchangeRate, Loan } from '../types';
+import { Client, CompanySettings, ExchangeRate, Loan, SystemUser, ClientChangeRequest } from '../types';
 import { generateFrenchSchedule, recalculateOverdue } from './frenchAmortization';
 
 // Realistic SVG Data URIs for documents
@@ -53,18 +53,307 @@ export const initialExchangeRates: ExchangeRate = {
   symbol: 'Bs',
 };
 
+// System Users (Jefe de Agencia vs Asesor de Préstamos - Imagen 1)
+export const initialUsers: SystemUser[] = [
+  {
+    id: 'usr-001',
+    username: 'jefe.alejandro',
+    fullName: 'Lic. Alejandro Morales Rivera',
+    role: 'JEFE_AGENCIA',
+    agency: 'Agencia Central',
+    email: 'amorales@crediplus.bo',
+    phone: '+591 2 244 5566',
+    isActive: true,
+    isLocked: false,
+    password: 'JefePassword2026*',
+    createdAt: '2026-01-10',
+  },
+  {
+    id: 'usr-002',
+    username: 'asesor.flimachi',
+    fullName: 'Fernando Limachi Orellana',
+    role: 'ASESOR_PRESTAMOS',
+    agency: 'Agencia Central',
+    email: 'flimachi@crediplus.bo',
+    phone: '+591 706 88210',
+    isActive: true,
+    isLocked: false,
+    password: 'AsesorPass2026*',
+    createdAt: '2026-02-01',
+  },
+  {
+    id: 'usr-003',
+    username: 'asesor.cloza',
+    fullName: 'Carlos Loza Quinteros',
+    role: 'ASESOR_PRESTAMOS',
+    agency: 'Agencia El Alto',
+    email: 'cloza@crediplus.bo',
+    phone: '+591 712 33490',
+    isActive: true,
+    isLocked: true, // Asesor bloqueado: solo Jefe de Agencia puede reiniciar/desbloquear
+    password: 'Temporal123*',
+    createdAt: '2026-03-15',
+  },
+];
+
+// Solicitudes de Modificación de Datos de Clientes (Imagen 2)
+export const initialClientChangeRequests: ClientChangeRequest[] = [
+  {
+    id: 'req-001',
+    clientId: 'cli-mostacedo',
+    clientName: 'Fernando Mostacedo Ordoñez',
+    ci: '12646542131',
+    requestedByUserId: 'usr-002',
+    requestedByUserName: 'Fernando Limachi Orellana',
+    requestDate: '2026-11-02 10:30',
+    status: 'PENDIENTE',
+    reason: 'Cliente actualizó su estado civil a Casado y presentó nuevo certificado comercial en SEGIP.',
+    changedFields: [
+      {
+        fieldKey: 'maritalStatusDeclared',
+        fieldName: 'Estado Civil Declarado por Cliente',
+        currentValue: 'SOLTERO(A)',
+        proposedValue: 'CASADO(A)',
+      },
+      {
+        fieldKey: 'occupation',
+        fieldName: 'Actividad / Ocupación Declarada',
+        currentValue: 'Comerciante Minorista',
+        proposedValue: 'Comerciante Distribuidor Mayorista',
+      },
+    ],
+  },
+  {
+    id: 'req-002',
+    clientId: 'cli-mercedes',
+    clientName: 'SARDAN AOIZ VDA. DE AMEZAGA MERCEDES',
+    ci: '3649854',
+    requestedByUserId: 'usr-002',
+    requestedByUserName: 'Fernando Limachi Orellana',
+    requestDate: '2026-10-20 14:15',
+    status: 'AUTORIZADO',
+    reviewedByUserId: 'usr-001',
+    reviewedByUserName: 'Lic. Alejandro Morales Rivera',
+    reviewDate: '2026-10-21 09:30',
+    reviewNotes: 'Aprobado de conformidad con verificación domiciliaria realizada.',
+    reason: 'Ampliación de vigencia de cédula de identidad conforme a renovación en SEGIP.',
+    changedFields: [
+      {
+        fieldKey: 'ciExpirationDate',
+        fieldName: 'Fecha de Expiración CI',
+        currentValue: '2024-04-22',
+        proposedValue: '2031-04-22',
+      },
+    ],
+  },
+];
+
 export const initialClients: Client[] = [
+  // 1. Cliente Fernando Mostacedo Ordoñez (Ejemplo exacto de Imagen 2)
+  {
+    id: 'cli-mostacedo',
+    clientCode: '001',
+    fullName: 'Fernando Mostacedo Ordoñez',
+    paternalSurname: 'Mostacedo',
+    maternalSurname: 'Ordoñez',
+    firstName: 'Fernando',
+    documentType: 'CI',
+    documentNumber: '12646542131',
+    ciExpedition: 'LP',
+    ciExpirationDate: '2030-05-18',
+    birthDate: '1982-11-14',
+    gender: 'MASCULINO',
+    maritalStatusCi: 'SOLTERO(A)',
+    maritalStatusDeclared: 'SOLTERO(A)',
+    phone: '+591 715 44920',
+    email: 'fmostacedo@comercial.bo',
+    address: 'Av. Buenos Aires N° 1420, Zona Max Paredes',
+    city: 'La Paz',
+    occupation: 'Comerciante Mayorista Textil',
+    monthlyIncome: 18500,
+    registeredBy: 'Fernando Limachi Orellana',
+    agency: 'Agencia Central',
+    registrationDate: '2025-03-12',
+    solicitudeNumber: '1264654',
+    status: 'HABILITADO',
+    homeAddress: {
+      locality: 'La Paz',
+      street: 'Av. Buenos Aires',
+      number: '1420',
+      neighborhood: 'Zona Max Paredes',
+      housingType: 'Propio',
+      locationReference: 'Frente a galería Comercial Las Rosas',
+      cellphone: '71544920',
+    },
+    sameAddressForBusiness: true,
+    caedecCode: '52321',
+    activityDescription: 'Venta al por mayor de prendas de vestir y tejidos',
+    activitySeniorityMonths: 48,
+    economicSector: 'Comercio',
+    references: [
+      {
+        fullName: 'JUAN CARLOS TITO CONDORI',
+        relationship: 'COMERCIAL',
+        address: 'Calle Illampu N° 850, La Paz',
+        phone: '76299102',
+      },
+      {
+        fullName: 'MARINA APAZA DE MAMANI',
+        relationship: 'VECINO',
+        address: 'Av. Buenos Aires N° 1435, La Paz',
+        phone: '70133481',
+      },
+    ],
+    documents: [
+      {
+        id: 'doc-m1',
+        title: 'Cédula de Identidad (CI) Fernando Mostacedo',
+        type: 'DNI_FRONT',
+        fileUrl: createSvgDoc('CÉDULA DE IDENTIDAD (CI)', '#1e3a8a', 'CI BOLIVIA 12646542131'),
+        fileName: 'ci_mostacedo.png',
+        uploadDate: '2025-03-12',
+        fileSize: '1.2 MB',
+      },
+      {
+        id: 'doc-m2',
+        title: 'Licencia de Funcionamiento Alcaldía GAMLP',
+        type: 'INGRESOS',
+        fileUrl: createSvgDoc('LICENCIA DE ACTIVIDAD ECONÓMICA', '#0284c7', 'GAMLP'),
+        fileName: 'licencia_comercial.pdf',
+        uploadDate: '2025-03-12',
+        fileSize: '2.8 MB',
+      },
+    ],
+  },
+  // 2. Cliente SARDAN AOIZ VDA. DE AMEZAGA MERCEDES (Ficha oficial Imagen 2)
+  {
+    id: 'cli-mercedes',
+    clientCode: '922744',
+    solicitudeNumber: '3649854',
+    fullName: 'SARDAN AOIZ VDA. DE AMEZAGA MERCEDES',
+    paternalSurname: 'Sardan',
+    maternalSurname: 'Aoiz',
+    marriedSurname: 'Vda. de Amezaga',
+    firstName: 'Mercedes',
+    documentType: 'CI',
+    documentNumber: '3649854',
+    ciExpedition: 'CB',
+    ciExpirationDate: '2031-04-22',
+    birthDate: '1975-09-24',
+    gender: 'FEMENINO',
+    maritalStatusCi: 'VIUDO(A)',
+    maritalStatusDeclared: 'VIUDO(A)',
+    phone: '+591 4 456 7890',
+    email: 'mercedes.sardan@gmail.bo',
+    address: 'Calle Demetrio Canelas Nro 105, Zona El Morro',
+    city: 'Cochabamba',
+    occupation: 'Comerciante - Tienda de Barrio',
+    monthlyIncome: 9200,
+    registeredBy: 'LIMACHI ORELLANA FERNANDO',
+    agency: 'Agencia Central',
+    registrationDate: '20/07/2022',
+    status: 'HABILITADO',
+    homeAddress: {
+      locality: 'Cochabamba',
+      street: 'Calle Demetrio Canelas',
+      number: '105',
+      neighborhood: 'Zona El Morro',
+      housingType: 'Propio',
+      locationReference: 'A dos cuadras del templo',
+      cellphone: '75788510',
+    },
+    sameAddressForBusiness: true,
+    caedecCode: '51329',
+    activityDescription: 'Tienda de Barrio y Abarrotes',
+    activitySeniorityMonths: 17,
+    economicSector: 'Comercio',
+    references: [
+      {
+        fullName: 'ANACLETO FIGUEROA',
+        relationship: 'VECINO',
+        address: 'CALLE DEMETRIO CANELAS S/N, ZONA EL MORRO',
+        phone: 'CEL: 73987164',
+      },
+      {
+        fullName: 'SANDRA AGUILAR',
+        relationship: 'VECINO',
+        address: 'CALLE DEMETRIO CANELAS S/N, ZONA EL MORRO',
+        phone: 'CEL: 71948537',
+      },
+    ],
+    documents: [
+      {
+        id: 'doc-s1',
+        title: 'Cédula de Identidad (CI) Mercedes Sardan',
+        type: 'DNI_FRONT',
+        fileUrl: createSvgDoc('CÉDULA DE IDENTIDAD (CI)', '#1e3a8a', 'CI BOLIVIA 3649854'),
+        fileName: 'ci_mercedes_sardan.png',
+        uploadDate: '2022-07-20',
+        fileSize: '1.3 MB',
+      },
+    ],
+  },
   {
     id: 'cli-001',
+    clientCode: 'CLI-001',
     fullName: 'Roberto Carlos Mendoza Silva',
+    paternalSurname: 'Mendoza',
+    maternalSurname: 'Silva',
+    firstName: 'Roberto Carlos',
     documentType: 'CI',
     documentNumber: '4789123-LP',
+    ciExpedition: 'LP',
+    ciExpirationDate: '2028-11-10',
+    birthDate: '1985-05-20',
+    gender: 'MASCULINO',
+    maritalStatusCi: 'CASADO(A)',
+    maritalStatusDeclared: 'CASADO(A)',
     phone: '+591 706 34155',
     email: 'rmendoza@comercial.bo',
     address: 'Av. Ballivián 1250, Calacoto',
     city: 'La Paz',
     occupation: 'Comerciante Minorista',
     monthlyIncome: 8500,
+    registeredBy: 'Fernando Limachi Orellana',
+    agency: 'Agencia Central',
+    registrationDate: '2026-08-10',
+    status: 'HABILITADO',
+    homeAddress: {
+      locality: 'La Paz',
+      street: 'Av. Ballivián',
+      number: '1250',
+      neighborhood: 'Calacoto',
+      housingType: 'Propio',
+      locationReference: 'Calle 21 Calacoto',
+      cellphone: '70634155',
+    },
+    sameAddressForBusiness: true,
+    caedecCode: '52110',
+    activityDescription: 'Comercio Minorista de Abarrotes',
+    activitySeniorityMonths: 36,
+    economicSector: 'Comercio',
+    spouse: {
+      fullName: 'Maritza Silva Valdivia',
+      ci: '4098712-LP',
+      caedec: '52110',
+      activity: 'Comercio',
+      seniorityMonths: 24,
+      economicSector: 'Comercio Minorista',
+    },
+    references: [
+      {
+        fullName: 'GONZALO VALDIVIA PÉREZ',
+        relationship: 'FAMILIAR',
+        address: 'Calle 18 de Calacoto N° 340',
+        phone: '77299104',
+      },
+      {
+        fullName: 'TERESA CONDORI MAMANI',
+        relationship: 'COMERCIAL',
+        address: 'Av. Ballivián N° 1220',
+        phone: '70611299',
+      },
+    ],
     guarantorName: 'Maritza Silva Valdivia',
     guarantorDoc: '4098712-LP',
     guarantorPhone: '+591 772 23901',
@@ -400,7 +689,179 @@ function generateSeedLoans(): Loan[] {
     outstandingBalance: sched4[2].remainingBalance,
   };
 
-  return [loan1, loan2, loan3, loan4];
+  // 5. Préstamos de Fernando Mostacedo Ordoñez (Imagen 2)
+  // 5.1 Crédito Operación 01213213 - Saldo Bs 15,000 - Vigente
+  const schedM1 = generateFrenchSchedule({
+    principal: 25000,
+    monthlyInterestRatePercent: 3.0,
+    termPeriods: 10,
+    frequency: 'MENSUAL',
+    startDate: '2026-05-10',
+    insuranceOrMonthlyFee: 20,
+  });
+  schedM1[0].status = 'PAGADA';
+  schedM1[0].paidAmount = schedM1[0].paymentAmount;
+  schedM1[1].status = 'PAGADA';
+  schedM1[1].paidAmount = schedM1[1].paymentAmount;
+  schedM1[2].status = 'PAGADA';
+  schedM1[2].paidAmount = schedM1[2].paymentAmount;
+  schedM1[3].status = 'PAGADA';
+  schedM1[3].paidAmount = schedM1[3].paymentAmount;
+
+  const loanMostacedo1: Loan = {
+    id: 'loan-m-01',
+    loanNumber: '01213213',
+    clientId: 'cli-mostacedo',
+    clientName: 'Fernando Mostacedo Ordoñez',
+    clientDocument: 'CI 12646542131',
+    principalAmount: 25000,
+    currency: 'BOB',
+    annualInterestRate: 36.0,
+    monthlyInterestRate: 3.0,
+    termMonths: 10,
+    frequency: 'MENSUAL',
+    totalInstallments: 10,
+    fixedInstallmentAmount: schedM1[0].paymentAmount,
+    startDate: '2026-05-10',
+    status: 'ACTIVO',
+    collateralDescription: 'Garantía Personal y Pagaré Mercantil',
+    collateralEstimatedValue: 35000,
+    schedule: schedM1,
+    documents: initialClients[0].documents,
+    notes: 'Crédito vigente al día con buen comportamiento de pago.',
+    totalInterestExpected: 4200,
+    totalAmountExpected: 29200,
+    totalPaid: 10000,
+    outstandingBalance: 15000,
+  };
+
+  // 5.2 Crédito Operación 01654654654 - Saldo Bs 00.00 - Cancelado
+  const schedM2 = generateFrenchSchedule({
+    principal: 10000,
+    monthlyInterestRatePercent: 3.5,
+    termPeriods: 6,
+    frequency: 'MENSUAL',
+    startDate: '2025-06-15',
+    insuranceOrMonthlyFee: 15,
+  });
+  schedM2.forEach((s, idx) => {
+    s.status = 'PAGADA';
+    s.paidAmount = s.paymentAmount;
+    s.paidDate = `2025-0${7 + idx}-15`;
+    s.remainingBalance = 0;
+  });
+
+  const loanMostacedo2: Loan = {
+    id: 'loan-m-02',
+    loanNumber: '01654654654',
+    clientId: 'cli-mostacedo',
+    clientName: 'Fernando Mostacedo Ordoñez',
+    clientDocument: 'CI 12646542131',
+    principalAmount: 10000,
+    currency: 'BOB',
+    annualInterestRate: 42.0,
+    monthlyInterestRate: 3.5,
+    termMonths: 6,
+    frequency: 'MENSUAL',
+    totalInstallments: 6,
+    fixedInstallmentAmount: schedM2[0].paymentAmount,
+    startDate: '2025-06-15',
+    status: 'PAGADO',
+    collateralDescription: 'Pagaré a la orden cancelado',
+    collateralEstimatedValue: 12000,
+    schedule: schedM2,
+    documents: initialClients[0].documents,
+    notes: 'Crédito cancelado en su totalidad satisfactoriamente.',
+    totalInterestExpected: 1800,
+    totalAmountExpected: 11800,
+    totalPaid: 11800,
+    outstandingBalance: 0,
+  };
+
+  // 5.3 Crédito Operación 03546445 - Saldo Bs 11,500 - Vencido
+  let schedM3 = generateFrenchSchedule({
+    principal: 18000,
+    monthlyInterestRatePercent: 4.0,
+    termPeriods: 8,
+    frequency: 'MENSUAL',
+    startDate: '2026-03-20',
+    insuranceOrMonthlyFee: 20,
+  });
+  schedM3[0].status = 'PAGADA';
+  schedM3[0].paidAmount = schedM3[0].paymentAmount;
+  schedM3[1].status = 'PAGADA';
+  schedM3[1].paidAmount = schedM3[1].paymentAmount;
+  schedM3 = recalculateOverdue(schedM3, today, 0.15, 2);
+
+  const loanMostacedo3: Loan = {
+    id: 'loan-m-03',
+    loanNumber: '03546445',
+    clientId: 'cli-mostacedo',
+    clientName: 'Fernando Mostacedo Ordoñez',
+    clientDocument: 'CI 12646542131',
+    principalAmount: 18000,
+    currency: 'BOB',
+    annualInterestRate: 48.0,
+    monthlyInterestRate: 4.0,
+    termMonths: 8,
+    frequency: 'MENSUAL',
+    totalInstallments: 8,
+    fixedInstallmentAmount: schedM3[0].paymentAmount,
+    startDate: '2026-03-20',
+    status: 'VENCIDO',
+    collateralDescription: 'Prenda Mercantil Inventario Almacén',
+    collateralEstimatedValue: 22000,
+    schedule: schedM3,
+    documents: initialClients[0].documents,
+    notes: 'Crédito con cuota vencida. Requiere gestión de cobro.',
+    totalInterestExpected: 3600,
+    totalAmountExpected: 21600,
+    totalPaid: 6500,
+    outstandingBalance: 11500,
+  };
+
+  // 6. Préstamo Mercedes Sardan
+  const schedMerc = generateFrenchSchedule({
+    principal: 20000,
+    monthlyInterestRatePercent: 3.0,
+    termPeriods: 12,
+    frequency: 'MENSUAL',
+    startDate: '2026-04-15',
+    insuranceOrMonthlyFee: 25,
+  });
+  schedMerc[0].status = 'PAGADA';
+  schedMerc[0].paidAmount = schedMerc[0].paymentAmount;
+  schedMerc[1].status = 'PAGADA';
+  schedMerc[1].paidAmount = schedMerc[1].paymentAmount;
+
+  const loanMercedes: Loan = {
+    id: 'loan-merc-01',
+    loanNumber: 'PRE-2022-922',
+    clientId: 'cli-mercedes',
+    clientName: 'SARDAN AOIZ VDA. DE AMEZAGA MERCEDES',
+    clientDocument: 'CI 3649854',
+    principalAmount: 20000,
+    currency: 'BOB',
+    annualInterestRate: 36.0,
+    monthlyInterestRate: 3.0,
+    termMonths: 12,
+    frequency: 'MENSUAL',
+    totalInstallments: 12,
+    fixedInstallmentAmount: schedMerc[0].paymentAmount,
+    startDate: '2026-04-15',
+    status: 'ACTIVO',
+    collateralDescription: 'Inventario de Tienda de Barrio y fianza vecinal',
+    collateralEstimatedValue: 30000,
+    schedule: schedMerc,
+    documents: initialClients[1].documents,
+    notes: 'Cliente puntual en pagos de cuotas mensuales.',
+    totalInterestExpected: 3800,
+    totalAmountExpected: 23800,
+    totalPaid: 3800,
+    outstandingBalance: 16200,
+  };
+
+  return [loanMostacedo1, loanMostacedo2, loanMostacedo3, loanMercedes, loan1, loan2, loan3, loan4];
 }
 
 export const initialLoans: Loan[] = generateSeedLoans();

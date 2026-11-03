@@ -15,6 +15,7 @@ import { generateFrenchSchedule } from '../utils/frenchAmortization';
 
 interface NewLoanModalProps {
   initialValues?: {
+    clientId?: string;
     principal?: number;
     monthlyRate?: number;
     termPeriods?: number;
@@ -32,7 +33,9 @@ export const NewLoanModal: React.FC<NewLoanModalProps> = ({
 }) => {
   const { clients, addLoan, exchangeRate } = useLoanContext();
 
-  const [selectedClientId, setSelectedClientId] = useState<string>(clients[0]?.id || '');
+  const [selectedClientId, setSelectedClientId] = useState<string>(
+    initialValues?.clientId || clients[0]?.id || ''
+  );
   const [principal, setPrincipal] = useState<number>(initialValues?.principal || 3000);
   const [currency, setCurrency] = useState<'BOB' | 'USD' | 'PEN' | 'MXN' | 'EUR'>('BOB');
   const [monthlyRate, setMonthlyRate] = useState<number>(initialValues?.monthlyRate || 3.5);

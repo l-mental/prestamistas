@@ -412,3 +412,243 @@ export function exportAccountingReportPDF(
 
   doc.save(`Reporte_Contable_Cartera_${new Date().toISOString().slice(0, 10)}.pdf`);
 }
+
+export function exportClientInfoSheetPDF(client: Client, company: CompanySettings) {
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+  });
+
+  // Header Banner with Navy Blue corporate style
+  doc.setFillColor(30, 58, 138); // blue-900
+  doc.rect(0, 0, 210, 16, 'F');
+
+  doc.setFont('Helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.setTextColor(255, 255, 255);
+  doc.text('CREDI-PLUS BOLIVIA  |  SATEL FINANZAS', 14, 10);
+  doc.setFontSize(9);
+  doc.text('SISTEMA INTEGRADO DE GESTIÓN CREDITICIA', 130, 10);
+
+  // Document Title
+  doc.setFont('Helvetica', 'bold');
+  doc.setFontSize(15);
+  doc.setTextColor(30, 58, 138);
+  doc.text('FICHA DE INFORMACIÓN Y REGISTRO DEL CLIENTE', 14, 25);
+
+  doc.setFont('Helvetica', 'normal');
+  doc.setFontSize(8.5);
+  doc.setTextColor(100, 116, 139);
+  const todayStr = new Date().toLocaleDateString('es-BO', { year: 'numeric', month: 'long', day: 'numeric' });
+  doc.text(`CÓDIGO CLIENTE: ${client.clientCode || client.id}  |  FECHA DE IMPRESIÓN: ${todayStr}`, 14, 30);
+  doc.text(`AGENCIA: ${client.agency || 'Central'}  |  ASESOR DE CRÉDITO: ${client.registeredBy || 'Fernando Limachi Orellana'}`, 14, 35);
+
+  doc.setDrawColor(203, 213, 225);
+  doc.setLineWidth(0.4);
+  doc.line(14, 38, 196, 38);
+
+  let currentY = 43;
+
+  // 1. DATOS GENERALES DEL SOLICITANTE
+  doc.setFillColor(234, 179, 8); // yellow-500
+  doc.rect(14, currentY, 3, 6, 'F');
+  doc.setFont('Helvetica', 'bold');
+  doc.setFontSize(10.5);
+  doc.setTextColor(15, 23, 42);
+  doc.text('1. DATOS GENERALES DEL SOLICITANTE', 19, currentY + 4.5);
+  currentY += 8;
+
+  const generalRows = [
+    ['Cédula de Identidad:', `${client.documentNumber} ${client.documentExpedition || 'LP'} ${client.documentComplement ? `(${client.documentComplement})` : ''}`, 'Vencimiento C.I.:', client.idCardExpirationDate || 'Indefinido'],
+    ['Apellido Paterno:', client.paternalLastName || '-', 'Apellido Materno:', client.maternalLastName || '-'],
+    ['Apellido de Casada:', client.marriedLastName || '-', 'Nombres:', client.firstName || client.fullName],
+    ['Fecha de Nacimiento:', client.birthDate || '-', 'Género / Sexo:', client.gender === 'F' ? 'Femenino' : 'Masculino'],
+    ['Estado Civil (según CI):', client.civilStatusFromId || client.civilStatus || 'Soltero(a)', 'Estado Civil Declarado:', client.civilStatusDeclared || client.civilStatus || 'Soltero(a)'],
+    ['Teléfono / Celular:', client.phone || '-', 'Correo Electrónico:', client.email || 'No registrado'],
+  ];
+
+  autoTable(doc, {
+    startY: currentY,
+    body: generalRows,
+    theme: 'plain',
+    styles: { fontSize: 8, cellPadding: 1.5, textColor: [30, 41, 59] },
+    columnStyles: {
+      0: { fontStyle: 'bold', textColor: [71, 85, 105], cellWidth: 42 },
+      1: { cellWidth: 50 },
+      2: { fontStyle: 'bold', textColor: [71, 85, 105], cellWidth: 42 },
+      3: { cellWidth: 48 },
+    },
+  });
+
+  currentY = (doc as any).lastAutoTable.finalY + 6;
+
+  // 2. DOMICILIO Y UBICACIÓN
+  doc.setFillColor(234, 179, 8);
+  doc.rect(14, currentY, 3, 6, 'F');
+  doc.setFont('Helvetica', 'bold');
+  doc.setFontSize(10.5);
+  doc.setTextColor(15, 23, 42);
+  doc.text('2. DIRECCIÓN DE DOMICILIO Y NEGOCIO', 19, currentY + 4.5);
+  currentY += 8;
+
+  const dom = client.homeAddress;
+  const neg = client.businessAddress;
+
+  const addressRows = [
+    ['Departamento / Ciudad:', `${dom?.department || 'La Paz'} - ${dom?.city || '-'}`, 'Zona / Barrio:', dom?.zone || '-'],
+    ['Calle / Avenida / N°:', `${dom?.street || client.address} N° ${dom?.number || 'S/N'}`, 'Tipo de Vivienda:', dom?.housingType || 'Propio'],
+    ['Croquis / Referencia Domicilio:', dom?.reference || 'Sin observaciones de referencia', 'Celular Domicilio:', dom?.phone || client.phone],
+    ['¿Negocio en mismo domicilio?:', client.businessIsSameAddress ? 'SÍ (Caseta o local en misma dirección)' : 'NO (Dirección independiente)', 'Dirección Negocio:', client.businessIsSameAddress ? `${dom?.street || client.address} (Mismo Domicilio)` : (neg?.street ? `${neg.street} N° ${neg.number || ''}` : 'Mismo domicilio')],
+  ];
+
+  autoTable(doc, {
+    startY: currentY,
+    body: addressRows,
+    theme: 'plain',
+    styles: { fontSize: 8, cellPadding: 1.5, textColor: [30, 41, 59] },
+    columnStyles: {
+      0: { fontStyle: 'bold', textColor: [71, 85, 105], cellWidth: 48 },
+      1: { cellWidth: 44 },
+      2: { fontStyle: 'bold', textColor: [71, 85, 105], cellWidth: 42 },
+      3: { cellWidth: 48 },
+    },
+  });
+
+  currentY = (doc as any).lastAutoTable.finalY + 6;
+
+  // 3. ACTIVIDAD ECONÓMICA Y CAEDEC
+  doc.setFillColor(234, 179, 8);
+  doc.rect(14, currentY, 3, 6, 'F');
+  doc.setFont('Helvetica', 'bold');
+  doc.setFontSize(10.5);
+  doc.setTextColor(15, 23, 42);
+  doc.text('3. ACTIVIDAD ECONÓMICA Y CAEDEC', 19, currentY + 4.5);
+  currentY += 8;
+
+  const econRows = [
+    ['Código CAEDEC:', client.caedecCode || 'G4711 - Comercio Minorista', 'Sector Económico:', client.economicSector || 'Comercio'],
+    ['Actividad Principal:', client.declaredActivity || client.occupation || 'Comerciante Independiente', 'Antigüedad Actividad:', `${client.activitySeniorityMonths || 24} meses`],
+    ['Descripción Detallada:', client.activityDescription || 'Venta de mercadería al por menor y mayor en puesto fijo.', 'Ingreso Promedio Est.:', `Bs. ${((client.monthlyIncome || 800) * 13.2).toLocaleString('es-BO', { minimumFractionDigits: 2 })}`],
+  ];
+
+  autoTable(doc, {
+    startY: currentY,
+    body: econRows,
+    theme: 'plain',
+    styles: { fontSize: 8, cellPadding: 1.5, textColor: [30, 41, 59] },
+    columnStyles: {
+      0: { fontStyle: 'bold', textColor: [71, 85, 105], cellWidth: 42 },
+      1: { cellWidth: 50 },
+      2: { fontStyle: 'bold', textColor: [71, 85, 105], cellWidth: 42 },
+      3: { cellWidth: 48 },
+    },
+  });
+
+  currentY = (doc as any).lastAutoTable.finalY + 6;
+
+  // 4. DATOS DEL CÓNYUGE / CONVIVIENTE (Si aplica)
+  if (client.spouse && (client.civilStatus === 'CASADO' || client.civilStatus === 'CONVIVIENTE' || client.civilStatusDeclared === 'Casado(a)' || client.civilStatusDeclared === 'Conviviente')) {
+    doc.setFillColor(234, 179, 8);
+    doc.rect(14, currentY, 3, 6, 'F');
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(10.5);
+    doc.setTextColor(15, 23, 42);
+    doc.text('4. DATOS DEL CÓNYUGE / CONVIVIENTE', 19, currentY + 4.5);
+    currentY += 8;
+
+    const sp = client.spouse;
+    const spouseRows = [
+      ['Nombre Completo Cónyuge:', sp.fullName || '-', 'C.I. Cónyuge:', `${sp.documentNumber || '-'} ${sp.documentExpedition || ''}`],
+      ['Actividad Económica Cónyuge:', sp.activity || '-', 'Código CAEDEC:', sp.caedec || '-'],
+      ['Sector Económico Cónyuge:', sp.sector || '-', 'Antigüedad Actividad:', `${sp.seniorityMonths || 0} meses`],
+    ];
+
+    autoTable(doc, {
+      startY: currentY,
+      body: spouseRows,
+      theme: 'plain',
+      styles: { fontSize: 8, cellPadding: 1.5, textColor: [30, 41, 59] },
+      columnStyles: {
+        0: { fontStyle: 'bold', textColor: [71, 85, 105], cellWidth: 45 },
+        1: { cellWidth: 47 },
+        2: { fontStyle: 'bold', textColor: [71, 85, 105], cellWidth: 42 },
+        3: { cellWidth: 48 },
+      },
+    });
+
+    currentY = (doc as any).lastAutoTable.finalY + 6;
+  }
+
+  // 5. REFERENCIAS PERSONALES Y COMERCIALES
+  doc.setFillColor(234, 179, 8);
+  doc.rect(14, currentY, 3, 6, 'F');
+  doc.setFont('Helvetica', 'bold');
+  doc.setFontSize(10.5);
+  doc.setTextColor(15, 23, 42);
+  doc.text('5. REFERENCIAS PERSONALES / VECINALES / COMERCIALES', 19, currentY + 4.5);
+  currentY += 8;
+
+  const refs = client.personalReferences || [];
+  const refRows = refs.length > 0 ? refs.map((r, i) => [
+    `Ref. ${i + 1}: ${r.name}`,
+    `Parentesco/Relación: ${r.relationship}`,
+    `Teléf: ${r.phone}`,
+    `Dirección: ${r.address || '-'}`,
+  ]) : [
+    ['Referencia 1: Sin registrar', '-', '-', '-'],
+    ['Referencia 2: Sin registrar', '-', '-', '-'],
+  ];
+
+  autoTable(doc, {
+    startY: currentY,
+    body: refRows,
+    theme: 'grid',
+    styles: { fontSize: 7.5, cellPadding: 2, textColor: [30, 41, 59] },
+    headStyles: { fillColor: [30, 58, 138], textColor: [255, 255, 255] },
+  });
+
+  currentY = (doc as any).lastAutoTable.finalY + 12;
+
+  // Signatures Section (at least 3 boxes)
+  if (currentY > 240) {
+    doc.addPage();
+    currentY = 30;
+  }
+
+  doc.setFont('Helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(30, 41, 59);
+
+  // Box 1: Prestatario
+  doc.line(16, currentY + 16, 68, currentY + 16);
+  doc.text('FIRMA DEL PRESTATARIO', 22, currentY + 21);
+  doc.setFont('Helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.text(`C.I.: ${client.documentNumber} ${client.documentExpedition || ''}`, 22, currentY + 25);
+
+  // Box 2: Asesor de Crédito
+  doc.setFont('Helvetica', 'bold');
+  doc.line(78, currentY + 16, 132, currentY + 16);
+  doc.text('ASESOR DE CRÉDITO', 88, currentY + 21);
+  doc.setFont('Helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.text(client.registeredBy || 'Fernando Limachi Orellana', 82, currentY + 25);
+
+  // Box 3: Jefe de Agencia
+  doc.setFont('Helvetica', 'bold');
+  doc.line(142, currentY + 16, 194, currentY + 16);
+  doc.text('V°B° JEFE DE AGENCIA', 150, currentY + 21);
+  doc.setFont('Helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.text('Lic. Alejandro Morales V.', 150, currentY + 25);
+
+  // Footer note
+  doc.setFont('Helvetica', 'italic');
+  doc.setFontSize(6.5);
+  doc.setTextColor(148, 163, 184);
+  doc.text('Este documento constituye la Ficha Oficial de Registro de Cliente bajo normativa boliviana ASFI / CrediPlus. Declaración jurada de veracidad de datos.', 14, 285);
+
+  doc.save(`Ficha_Cliente_${client.documentNumber}_${client.paternalLastName || 'Cliente'}.pdf`);
+}
+

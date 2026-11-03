@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Client, CompanySettings, DocumentAttachment, ExchangeRate, Installment, Loan, PaymentReceipt } from '../types';
-import { initialClients, initialCompanySettings, initialExchangeRates, initialLoans } from '../utils/initialData';
+import { Client, CompanySettings, DocumentAttachment, ExchangeRate, Installment, Loan, PaymentReceipt, SystemUser, ClientChangeRequest } from '../types';
+import { initialClients, initialCompanySettings, initialExchangeRates, initialLoans, initialUsers, initialClientChangeRequests } from '../utils/initialData';
 import { recalculateOverdue } from '../utils/frenchAmortization';
 
 interface LoanContextType {
@@ -10,6 +10,21 @@ interface LoanContextType {
   exchangeRate: ExchangeRate;
   displayCurrency: 'USD' | 'LOCAL';
   setDisplayCurrency: (c: 'USD' | 'LOCAL') => void;
+  // User & Roles (Imagen 1)
+  users: SystemUser[];
+  currentUser: SystemUser;
+  setCurrentUser: (user: SystemUser) => void;
+  addUser: (user: SystemUser) => void;
+  updateUser: (user: SystemUser) => void;
+  deleteUser: (userId: string) => void;
+  resetUserPassword: (userId: string, newPass?: string) => void;
+  unlockUser: (userId: string) => void;
+  changeOwnPassword: (userId: string, newPass: string) => void;
+  // Solicitudes de Modificación de Clientes (Imagen 2)
+  clientChangeRequests: ClientChangeRequest[];
+  addClientChangeRequest: (req: ClientChangeRequest) => void;
+  approveClientChangeRequest: (requestId: string, notes?: string) => void;
+  rejectClientChangeRequest: (requestId: string, notes?: string) => void;
   // Actions
   addLoan: (loan: Loan) => void;
   updateLoan: (loan: Loan) => void;
@@ -83,6 +98,38 @@ export const LoanProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [displayCurrency, setDisplayCurrency] = useState<'USD' | 'LOCAL'>('LOCAL');
 
+  // Users & Roles (Imagen 1)
+  const [users, setUsers] = useState<SystemUser[]>(() => {
+    try {
+      const saved = localStorage.getItem('crediplus_users_v1');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.error(e);
+    }
+    return initialUsers;
+  });
+
+  const [currentUser, setCurrentUserState] = useState<SystemUser>(() => {
+    try {
+      const saved = localStorage.getItem('crediplus_current_user_v1');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.error(e);
+    }
+    return initialUsers[0];
+  });
+
+  // Client Modification Requests (Imagen 2)
+  const [clientChangeRequests, setClientChangeRequests] = useState<ClientChangeRequest[]>(() => {
+    try {
+      const saved = localStorage.getItem('crediplus_change_reqs_v1');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.error(e);
+    }
+    return initialClientChangeRequests;
+  });
+
   // Sync to local storage
   useEffect(() => {
     localStorage.setItem('crediplus_loans_bob_v1', JSON.stringify(loans));
@@ -99,6 +146,18 @@ export const LoanProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     localStorage.setItem('crediplus_fx_paralelo_v1', JSON.stringify(exchangeRate));
   }, [exchangeRate]);
+
+  useEffect(() => {
+    localStorage.setItem('crediplus_users_v1', JSON.stringify(users));
+  }, [users]);
+
+  useEffect(() => {
+    localStorage.setItem('crediplus_current_user_v1', JSON.stringify(currentUser));
+  }, [currentUser]);
+
+  useEffect(() => {
+    localStorage.setItem('crediplus_change_reqs_v1', JSON.stringify(clientChangeRequests));
+  }, [clientChangeRequests]);
 
   // Recalculate overdues on mount or date shift
   useEffect(() => {
@@ -146,6 +205,142 @@ export const LoanProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateExchangeRate = (rates: ExchangeRate) => {
     setExchangeRate(rates);
+  };
+
+  // User Management (Imagen 1)
+  const setCurrentUser = (user: SystemUser) => {
+    setCurrentUserState(user);
+  };
+
+  const addUser = (newUser: SystemUser) => {
+    setUsers(prev => [newUser, ...prev]);
+  };
+
+  const updateUser = (updated: SystemUser) => {
+    setUsers(prev => prev.map(u => (u.id === updated.id ? updated : u)));
+    if (currentUser.id === updated.id) {
+      setCurrentUserState(updated);
+    }
+  };
+
+  const deleteUser = (userId: string) => {
+    setUsers(prev => prev.filter(u => u.id !== userId));
+  };
+
+  const resetUserPassword = (userId: string, newPass = 'CrediPlus123*') => {
+    setUsers(prev =>
+      prev.map(u => {
+        if (u.id === userId) {
+          return {
+            ...u,
+            password: newPass,
+            isLocked: false,
+            failedAttempts: 0,
+            updatedAt: new Date().toISOString(),
+          };
+        }
+        return u;
+      })
+    );
+  };
+
+  const unlockUser = (userId: string) => {
+    setUsers(prev =>
+      prev.map(u => {
+        if (u.id === userId) {
+          return {
+            ...u,
+            isLocked: false,
+            failedAttempts: 0,
+            updatedAt: new Date().toISOString(),
+          };
+        }
+        return u;
+      })
+    );
+  };
+
+  const changeOwnPassword = (userId: string, newPass: string) => {
+    setUsers(prev =>
+      prev.map(u => {
+        if (u.id === userId) {
+          const updated = {
+            ...u,
+            password: newPass,
+            updatedAt: new Date().toISOString(),
+          };
+          if (currentUser.id === userId) {
+            setCurrentUserState(updated);
+          }
+          return updated;
+        }
+        return u;
+      })
+    );
+  };
+
+  // Solicitudes de Modificación de Datos de Clientes (Imagen 2)
+  const addClientChangeRequest = (req: ClientChangeRequest) => {
+    setClientChangeRequests(prev => [req, ...prev]);
+  };
+
+  const approveClientChangeRequest = (requestId: string, notes?: string) => {
+    const targetReq = clientChangeRequests.find(r => r.id === requestId);
+    if (!targetReq) return;
+
+    const nowStr = new Date().toISOString();
+    setClientChangeRequests(prev =>
+      prev.map(r =>
+        r.id === requestId
+          ? {
+              ...r,
+              status: 'AUTORIZADO',
+              authorizedBy: currentUser.fullName,
+              authorizedAt: nowStr,
+              reviewNotes: notes || r.reviewNotes,
+            }
+          : r
+      )
+    );
+
+    // Apply changes to target client
+    setClients(prevClients =>
+      prevClients.map(client => {
+        if (client.id !== targetReq.clientId) return client;
+        const updatedClient = { ...client };
+        targetReq.changedFields.forEach(field => {
+          const val = field.newValue ?? field.proposedValue;
+          if (field.fieldKey.includes('.')) {
+            const [parent, child] = field.fieldKey.split('.');
+            (updatedClient as any)[parent] = {
+              ...((updatedClient as any)[parent] || {}),
+              [child]: val,
+            };
+          } else {
+            (updatedClient as any)[field.fieldKey] = val;
+          }
+        });
+        updatedClient.updatedAt = nowStr;
+        return updatedClient;
+      })
+    );
+  };
+
+  const rejectClientChangeRequest = (requestId: string, notes?: string) => {
+    const nowStr = new Date().toISOString();
+    setClientChangeRequests(prev =>
+      prev.map(r =>
+        r.id === requestId
+          ? {
+              ...r,
+              status: 'RECHAZADO',
+              authorizedBy: currentUser.fullName,
+              authorizedAt: nowStr,
+              reviewNotes: notes || 'Solicitud rechazada por Jefe de Agencia.',
+            }
+          : r
+      )
+    );
   };
 
   const addDocumentToClient = (clientId: string, doc: DocumentAttachment) => {
@@ -323,6 +518,19 @@ export const LoanProvider: React.FC<{ children: React.ReactNode }> = ({ children
         exchangeRate,
         displayCurrency,
         setDisplayCurrency,
+        users,
+        currentUser,
+        setCurrentUser,
+        addUser,
+        updateUser,
+        deleteUser,
+        resetUserPassword,
+        unlockUser,
+        changeOwnPassword,
+        clientChangeRequests,
+        addClientChangeRequest,
+        approveClientChangeRequest,
+        rejectClientChangeRequest,
         addLoan,
         updateLoan,
         addClient,

@@ -30,18 +30,157 @@ export interface DocumentAttachment {
   fileSize?: string;
 }
 
+export type UserRole = 'JEFE_AGENCIA' | 'ASESOR_PRESTAMOS';
+
+export interface SystemUser {
+  id: string;
+  username: string; // Asesor no puede cambiar el usuario asignado
+  fullName: string;
+  role: UserRole; // Asesor no puede asignarse roles
+  agency: string; // ej. "Agencia Central", "Agencia El Alto"
+  email?: string;
+  phone?: string;
+  isActive?: boolean;
+  isLocked: boolean; // Si el asesor se bloqueara (Jefe puede reiniciar)
+  password?: string; // Contraseña
+  failedAttempts?: number;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface ClientChangeField {
+  fieldKey: string;
+  fieldName: string;
+  currentValue?: string;
+  oldValue?: string;
+  proposedValue?: string;
+  newValue?: string;
+  reason?: string;
+}
+
+export interface ClientChangeRequest {
+  id: string;
+  clientId: string;
+  clientName: string;
+  clientDocument?: string;
+  ci?: string;
+  requestedByUserId?: string;
+  requestedByUserName?: string;
+  requestedBy?: string;
+  requestDate?: string;
+  requestedAt?: string;
+  status: 'PENDIENTE' | 'AUTORIZADO' | 'RECHAZADO';
+  reviewedByUserId?: string;
+  reviewedByUserName?: string;
+  authorizedBy?: string;
+  authorizedAt?: string;
+  reviewDate?: string;
+  reviewNotes?: string;
+  reason?: string;
+  changedFields: ClientChangeField[];
+}
+
+export type BolivianDepartment = 'LP' | 'CB' | 'SC' | 'OR' | 'PT' | 'TJ' | 'CH' | 'BE' | 'PA' | 'SE';
+
+export interface ClientAddressDetail {
+  department?: BolivianDepartment;
+  city?: string;
+  locality?: string;
+  street: string;
+  number: string;
+  zone?: string;
+  neighborhood?: string;
+  housingType: 'Propio' | 'Familiar' | 'Anticrético' | 'Alquiler' | 'Cedido' | 'Otro';
+  reference?: string;
+  locationReference?: string;
+  phone?: string;
+  cellphone?: string;
+}
+
+export interface ClientPersonalReference {
+  name?: string;
+  fullName?: string;
+  relationship: string;
+  address: string;
+  phone: string;
+  notes?: string;
+}
+
+export interface ClientSpouseData {
+  fullName: string;
+  ci?: string;
+  documentNumber?: string;
+  documentExpedition?: BolivianDepartment;
+  caedec: string;
+  activity: string;
+  seniorityMonths: number;
+  sector?: 'Comercio' | 'Servicio' | 'Producción';
+  economicSector?: string;
+}
+
 export interface Client {
   id: string;
+  clientCode?: string; // Cod. Cliente (ej. "922744", "001")
   fullName: string;
-  documentType: 'DNI' | 'RUC' | 'CI' | 'RFC' | 'PASAPORTE';
-  documentNumber: string;
+  paternalSurname?: string;
+  paternalLastName?: string;
+  maternalSurname?: string;
+  maternalLastName?: string;
+  marriedSurname?: string;
+  marriedLastName?: string;
+  firstName?: string;
+  documentType: 'CI' | 'DNI' | 'RUC' | 'RFC' | 'PASAPORTE';
+  documentNumber: string; // C.I.
+  documentExpedition?: BolivianDepartment;
+  ciExpedition?: BolivianDepartment;
+  documentComplement?: string;
+  ciComplement?: string;
+  idCardExpirationDate?: string;
+  ciExpirationDate?: string; // Fecha de expiracion CI
+  birthDate?: string; // Fecha de nacimiento
+  gender?: 'MASCULINO' | 'FEMENINO' | 'M' | 'F';
+  civilStatusFromId?: string;
+  maritalStatusCi?: string;
+  civilStatusDeclared?: string;
+  maritalStatusDeclared?: string;
+  civilStatus?: 'SOLTERO' | 'CASADO' | 'VIUDO' | 'DIVORCIADO' | 'CONVIVIENTE' | string;
+  declaredActivity?: string;
+  occupation: string;
+  monthlyIncome: number;
   phone: string;
   email: string;
   address: string;
   city: string;
-  occupation: string;
-  monthlyIncome: number;
   documents: DocumentAttachment[];
+  
+  // Submódulo DIRECCIONES
+  homeAddress?: ClientAddressDetail;
+  businessIsSameAddress?: boolean;
+  sameAddressForBusiness?: boolean;
+  businessAddress?: ClientAddressDetail;
+
+  // Submódulo ACTIVIDAD ECONOMICA
+  caedecCode?: string;
+  activityDescription?: string;
+  activitySeniorityMonths?: number;
+  economicSector?: 'Comercio' | 'Servicio' | 'Producción';
+
+  // Submódulo DATOS GENERALES (Cónyuge / Conviviente)
+  spouse?: ClientSpouseData;
+
+  // Submódulo REFERENCIAS (Registro de dos referencias)
+  references?: ClientPersonalReference[];
+  personalReferences?: ClientPersonalReference[];
+
+  // Submódulo VALIDACION DE REGISTROS
+  registeredBy?: string; // Asesor de Préstamos
+  agency?: string; // Agencia
+  registrationDate?: string;
+  solicitudeNumber?: string; // Nro. Solicitud
+  status?: 'HABILITADO' | 'PENDIENTE_AUTORIZACION';
+  createdAt?: string;
+  updatedAt?: string;
+
   guarantorName?: string;
   guarantorDoc?: string;
   guarantorPhone?: string;

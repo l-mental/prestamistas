@@ -11,11 +11,15 @@ import {
   FileSpreadsheet,
   ArrowLeftRight,
   ShieldCheck,
+  Users,
+  ShieldAlert,
 } from 'lucide-react';
 import { useLoanContext } from '../context/LoanContext';
 
 export type NavView =
   | 'DASHBOARD'
+  | 'CLIENTS'
+  | 'USERS_ROLES'
   | 'CALCULATOR'
   | 'ACTIVE_PORTFOLIO'
   | 'PENDING_PAYMENTS'
@@ -36,9 +40,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setCurrentView,
   onOpenNewLoanModal,
 }) => {
-  const { loans, exchangeRate } = useLoanContext();
+  const { loans, exchangeRate, clients, clientChangeRequests } = useLoanContext();
 
   const overdueCount = loans.filter(l => l.status === 'VENCIDO').length;
+  const pendingChangeRequestsCount = clientChangeRequests.filter(r => r.status === 'PENDIENTE').length;
   
   // Pending installments due soon
   const today = new Date().toISOString().slice(0, 10);
@@ -52,6 +57,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Resumen General',
       icon: LayoutDashboard,
       badge: null,
+    },
+    {
+      id: 'CLIENTS' as NavView,
+      label: 'Módulo Clientes',
+      icon: Users,
+      badge: `${clients.length} reg.`,
+      badgeColor: 'bg-yellow-400 text-slate-900 font-bold',
+    },
+    {
+      id: 'USERS_ROLES' as NavView,
+      label: 'Usuarios y Roles',
+      icon: ShieldAlert,
+      badge: pendingChangeRequestsCount > 0 ? `${pendingChangeRequestsCount} sol.` : 'Matriz',
+      badgeColor: pendingChangeRequestsCount > 0 ? 'bg-yellow-400 text-slate-900 font-bold animate-pulse' : 'bg-blue-600/30 text-blue-300 border border-blue-500/30',
     },
     {
       id: 'CALCULATOR' as NavView,

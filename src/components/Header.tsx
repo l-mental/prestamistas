@@ -22,12 +22,19 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onOpenNewLoanModal 
     setDisplayCurrency,
     exchangeRate,
     loans,
+    users,
+    currentUser,
+    setCurrentUser,
   } = useLoanContext();
 
   const getTitle = () => {
     switch (currentView) {
       case 'DASHBOARD':
         return 'Panel de Control y Resumen General';
+      case 'CLIENTS':
+        return 'Módulo de Clientes — Búsqueda por C.I., Altas y Fichas Oficiales';
+      case 'USERS_ROLES':
+        return 'Módulo de Usuarios, Roles & Seguridad — Matriz de Privilegios';
       case 'CALCULATOR':
         return 'Calculadora y Cotizador de Préstamos (Sistema Francés)';
       case 'ACTIVE_PORTFOLIO':
@@ -118,6 +125,41 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onOpenNewLoanModal 
           <FileSpreadsheet className="w-4 h-4 text-blue-700" />
           <span>Reporte PDF</span>
         </button>
+
+        {/* Active User Badge & Switcher */}
+        <div className="flex items-center gap-2 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-lg">
+          <div className="text-right">
+            <div className="text-[11px] font-bold text-slate-800 leading-none">
+              {currentUser.fullName}
+            </div>
+            <div className="text-[9px] font-extrabold uppercase mt-0.5 tracking-wider">
+              {currentUser.role === 'JEFE_AGENCIA' ? (
+                <span className="text-blue-900 bg-yellow-400 px-1 py-0.2 rounded font-black">
+                  Jefe Agencia
+                </span>
+              ) : (
+                <span className="text-white bg-blue-700 px-1 py-0.2 rounded">
+                  Asesor Crédito
+                </span>
+              )}
+            </div>
+          </div>
+          <select
+            value={currentUser.id}
+            onChange={e => {
+              const u = users.find(usr => usr.id === e.target.value);
+              if (u) setCurrentUser(u);
+            }}
+            title="Cambiar usuario activo para simulación"
+            className="bg-white border border-slate-300 text-[11px] text-slate-700 font-medium rounded p-0.5 cursor-pointer focus:outline-none"
+          >
+            {users.map(u => (
+              <option key={u.id} value={u.id}>
+                {u.username} ({u.role === 'JEFE_AGENCIA' ? 'Jefe' : 'Asesor'})
+              </option>
+            ))}
+          </select>
+        </div>
 
         {/* New Loan Button */}
         <button

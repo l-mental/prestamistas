@@ -16,6 +16,8 @@ import { CivilContractView } from './components/CivilContractView';
 import { ClientDocumentsView } from './components/ClientDocumentsView';
 import { AccountingReports } from './components/AccountingReports';
 import { ExchangeRateConfig } from './components/ExchangeRateConfig';
+import { ClientsModule } from './components/ClientsModule';
+import { UsersRolesModule } from './components/UsersRolesModule';
 import { PaymentModal } from './components/PaymentModal';
 import { NewLoanModal } from './components/NewLoanModal';
 import { Loan } from './types';
@@ -90,6 +92,19 @@ function MainAppContent() {
                 onSelectLoanForPayment={handleOpenPayment}
               />
             )}
+
+            {currentView === 'CLIENTS' && (
+              <ClientsModule
+                onOpenNewLoanModal={clientId => {
+                  setNewLoanInitialParams(clientId ? { clientId } : null);
+                  setIsNewLoanModalOpen(true);
+                }}
+                onOpenPaymentModal={handleOpenPayment}
+                onOpenContractView={handleViewContract}
+              />
+            )}
+
+            {currentView === 'USERS_ROLES' && <UsersRolesModule />}
 
             {currentView === 'CALCULATOR' && (
               <FrenchCalculator onConvertToLoan={handleConvertToLoanFromCalculator} />
