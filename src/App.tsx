@@ -20,9 +20,11 @@ import { ClientsModule } from './components/ClientsModule';
 import { UsersRolesModule } from './components/UsersRolesModule';
 import { PaymentModal } from './components/PaymentModal';
 import { NewLoanModal } from './components/NewLoanModal';
+import { LoginScreen } from './components/LoginScreen';
 import { Loan } from './types';
 
 function MainAppContent() {
+  const { isAuthenticated } = useLoanContext();
   const [currentView, setCurrentView] = useState<NavView>('DASHBOARD');
 
   // Modals state
@@ -35,6 +37,10 @@ function MainAppContent() {
   // Selected loan or client for deep-linking between views
   const [contractSelectedLoan, setContractSelectedLoan] = useState<Loan | null>(null);
   const [docsSelectedClientId, setDocsSelectedClientId] = useState<string | undefined>(undefined);
+
+  if (!isAuthenticated) {
+    return <LoginScreen />;
+  }
 
   const handleOpenPayment = (loan: Loan, installmentNumber?: number) => {
     setPaymentLoan(loan);

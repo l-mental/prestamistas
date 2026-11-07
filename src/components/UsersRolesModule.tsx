@@ -31,6 +31,7 @@ export const UsersRolesModule: React.FC = () => {
     resetUserPassword,
     unlockUser,
     changeOwnPassword,
+    generateUserToken,
     clientChangeRequests,
     approveClientChangeRequest,
     rejectClientChangeRequest,
@@ -51,7 +52,9 @@ export const UsersRolesModule: React.FC = () => {
   const [newUserFullName, setNewUserFullName] = useState('');
   const [newUserRole, setNewUserRole] = useState<UserRole>('ASESOR_PRESTAMOS');
   const [newUserAgency, setNewUserAgency] = useState('Agencia Central');
-  const [newUserPassword, setNewUserPassword] = useState('CrediPlus123*');
+  const [newUserPassword, setNewUserPassword] = useState('123456');
+  const [newUserToken, setNewUserToken] = useState(() => `TOK-${Math.floor(1000 + Math.random() * 9000)}`);
+  const [copiedTokenUserId, setCopiedTokenUserId] = useState<string | null>(null);
 
   // Review Client Change Request modal state (Jefe only)
   const [selectedRequest, setSelectedRequest] = useState<ClientChangeRequest | null>(null);
@@ -103,6 +106,7 @@ export const UsersRolesModule: React.FC = () => {
       role: newUserRole,
       agency: newUserAgency,
       password: newUserPassword,
+      accessToken: newUserRole === 'ASESOR_PRESTAMOS' ? newUserToken.trim().toUpperCase() : undefined,
       isLocked: false,
       failedAttempts: 0,
       createdAt: new Date().toISOString(),
@@ -112,7 +116,12 @@ export const UsersRolesModule: React.FC = () => {
     setIsCreateUserModalOpen(false);
     setNewUserUsername('');
     setNewUserFullName('');
-    alert(`Usuario ${created.username} (${created.role}) creado exitosamente.`);
+    setNewUserToken(`TOK-${Math.floor(1000 + Math.random() * 9000)}`);
+    alert(
+      `Usuario ${created.username} (${created.role}) creado exitosamente.${
+        created.accessToken ? ` Token de acceso asignado: ${created.accessToken}` : ''
+      }`
+    );
   };
 
   // Pending and authorized requests
@@ -465,8 +474,9 @@ export const UsersRolesModule: React.FC = () => {
                     <th className="p-3">Nombre Completo</th>
                     <th className="p-3">Rol</th>
                     <th className="p-3">Agencia</th>
+                    <th className="p-3">Token de Acceso</th>
                     <th className="p-3 text-center">Estado</th>
-                    <th className="p-3 text-center">Intentos Fallidos</th>
+                    <th className="p-3 text-center">Intentos</th>
                     <th className="p-3 text-right">Acciones de Jefatura</th>
                   </tr>
                 </thead>
@@ -487,6 +497,42 @@ export const UsersRolesModule: React.FC = () => {
                         </span>
                       </td>
                       <td className="p-3 text-slate-400">{u.agency}</td>
+                      <td className="p-3">
+                        {u.role === 'JEFE_AGENCIA' ? (
+                          <span className="text-[11px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded">
+                            Sin token (Admin)
+                          </span>
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-mono font-bold text-xs text-yellow-300 bg-slate-950 border border-slate-700 px-2 py-0.5 rounded">
+                              {u.accessToken || 'Sin Token'}
+                            </span>
+                            <button
+                              onClick={() => {
+                                const newToken = generateUserToken(u.id);
+                                alert(`Nuevo token generado para ${u.username}: ${newToken}`);
+                              }}
+                              title="Generar / Renovar Token único"
+                              className="px-1.5 py-0.5 bg-yellow-400/20 hover:bg-yellow-400/30 text-yellow-300 border border-yellow-400/40 rounded text-[10px] font-bold cursor-pointer"
+                            >
+                              Renovar
+                            </button>
+                            {u.accessToken && (
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard?.writeText(u.accessToken || '');
+                                  setCopiedTokenUserId(u.id);
+                                  setTimeout(() => setCopiedTokenUserId(null), 2000);
+                                }}
+                                title="Copiar Token"
+                                className="px-1.5 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px]"
+                              >
+                                {copiedTokenUserId === u.id ? '✓' : 'Copiar'}
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </td>
                       <td className="p-3 text-center">
                         <span
                           className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
@@ -712,6 +758,53 @@ export const UsersRolesModule: React.FC = () => {
                 <span className="text-[10px] text-slate-500 block mt-0.5">
                   El asesor podrá cambiar esta contraseña al ingresar.
                 </span>
+              </div>
+
+              {/* Token de Acceso (Solo Administrador puede generar) */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block font-semibold text-slate-300">
+                    Token de Acceso (Generado por Administrador) *
+                  </label>
+                  {newUserRole === 'JEFE_AGENCIA' ? (
+                    <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.2 rounded">
+                      No requerido para Admin
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-yellow-300 font-bold bg-yellow-400/20 px-1.5 py-0.2 rounded">
+                      Obligatorio para Asesor
+                    </span>
+                  )}
+                </div>
+
+                {newUserRole === 'ASESOR_PRESTAMOS' ? (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={newUserToken}
+                        onChange={e => setNewUserToken(e.target.value.toUpperCase())}
+                        placeholder="Ej: TOK-8821"
+                        className="flex-1 bg-slate-950 border border-yellow-400/50 rounded-lg px-3 py-2 text-yellow-300 font-mono font-bold text-sm tracking-wide"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setNewUserToken(`TOK-${Math.floor(1000 + Math.random() * 9000)}`)}
+                        className="px-3 py-2 bg-yellow-400 hover:bg-yellow-500 text-slate-950 rounded-lg font-bold text-xs shrink-0"
+                      >
+                        Generar Nuevo
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-slate-400 leading-tight">
+                      El administrador es el único autorizado para crear o renovar este token. El asesor lo necesitará para iniciar sesión junto con su contraseña.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="p-2.5 bg-slate-950/70 border border-slate-800 rounded-lg text-slate-400 text-xs">
+                    Los usuarios con rol de <strong>Jefe de Agencia / Administrador</strong> no requieren token para ingresar al sistema.
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-end gap-2 pt-3">

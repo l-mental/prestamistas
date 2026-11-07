@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   Users,
   ShieldAlert,
+  LogOut,
 } from 'lucide-react';
 import { useLoanContext } from '../context/LoanContext';
 
@@ -40,7 +41,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setCurrentView,
   onOpenNewLoanModal,
 }) => {
-  const { loans, exchangeRate, clients, clientChangeRequests } = useLoanContext();
+  const { loans, exchangeRate, clients, clientChangeRequests, currentUser, logout } = useLoanContext();
 
   const overdueCount = loans.filter(l => l.status === 'VENCIDO').length;
   const pendingChangeRequestsCount = clientChangeRequests.filter(r => r.status === 'PENDIENTE').length;
@@ -192,6 +193,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
           );
         })}
       </nav>
+
+      {/* Active User & Logout mini card */}
+      <div className="px-3 py-2 border-t border-slate-800 bg-slate-950/40 flex items-center justify-between text-xs">
+        <div className="min-w-0 flex-1">
+          <div className="text-[11px] font-bold text-white truncate">
+            {currentUser.fullName}
+          </div>
+          <div className="text-[9px] text-slate-400 font-medium">
+            {currentUser.role === 'JEFE_AGENCIA' ? (
+              <span className="text-yellow-400 font-bold">Jefe de Agencia (Sin token)</span>
+            ) : (
+              <span className="text-blue-300 font-mono">Token: {currentUser.accessToken || 'Activo'}</span>
+            )}
+          </div>
+        </div>
+        <button
+          onClick={logout}
+          title="Cerrar Sesión"
+          className="p-1.5 rounded-lg bg-slate-800 hover:bg-red-500/20 hover:text-red-400 text-slate-400 transition-colors cursor-pointer shrink-0 ml-2"
+        >
+          <LogOut className="w-3.5 h-3.5" />
+        </button>
+      </div>
 
       {/* Exchange Rate Mini Ticker Footer */}
       <div className="p-4 border-t border-slate-800 bg-slate-950/70 text-xs">

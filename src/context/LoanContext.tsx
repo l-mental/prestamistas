@@ -10,6 +10,10 @@ interface LoanContextType {
   exchangeRate: ExchangeRate;
   displayCurrency: 'USD' | 'LOCAL';
   setDisplayCurrency: (c: 'USD' | 'LOCAL') => void;
+  // Auth & Session
+  isAuthenticated: boolean;
+  login: (username: string, password: string, token?: string) => { success: boolean; message?: string };
+  logout: () => void;
   // User & Roles (Imagen 1)
   users: SystemUser[];
   currentUser: SystemUser;
@@ -20,6 +24,7 @@ interface LoanContextType {
   resetUserPassword: (userId: string, newPass?: string) => void;
   unlockUser: (userId: string) => void;
   changeOwnPassword: (userId: string, newPass: string) => void;
+  generateUserToken: (userId: string) => string;
   // Solicitudes de Modificación de Clientes (Imagen 2)
   clientChangeRequests: ClientChangeRequest[];
   addClientChangeRequest: (req: ClientChangeRequest) => void;
@@ -119,6 +124,17 @@ export const LoanProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return initialUsers[0];
   });
 
+  // Auth session
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    try {
+      const savedAuth = localStorage.getItem('crediplus_is_authenticated_v1');
+      if (savedAuth !== null) return savedAuth === 'true';
+    } catch (e) {
+      console.error(e);
+    }
+    return true; // Logged in initially to facilitate review, with 1-click logout available
+  });
+
   // Client Modification Requests (Imagen 2)
   const [clientChangeRequests, setClientChangeRequests] = useState<ClientChangeRequest[]>(() => {
     try {
@@ -207,12 +223,104 @@ export const LoanProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setExchangeRate(rates);
   };
 
+  // Authentication & Token Logic
+  const login = (
+    username: string,
+    password: string,
+    token?: string
+  ): { success: boolean; message?: string } => {
+    const cleanUser = username.trim().toLowerCase();
+    const user = users.find(
+      u => u.username.toLowerCase() === cleanUser || (cleanUser === 'admin' && u.role === 'JEFE_AGENCIA')
+    );
+
+    if (!user) {
+      return { success: false, message: 'Usuario no registrado en el sistema.' };
+    }
+
+    if (user.isLocked) {
+      return {
+        success: false,
+        message: 'Cuenta bloqueada por seguridad. Debe solicitar al Jefe de Agencia que reinicie su clave y desbloquee el usuario.',
+      };
+    }
+
+    if (user.password && user.password !== password) {
+      // Register failed attempt
+      setUsers(prev =>
+        prev.map(u => (u.id === user.id ? { ...u, failedAttempts: (u.failedAttempts || 0) + 1 } : u))
+      );
+      return { success: false, message: 'Contraseña incorrecta. Verifique sus credenciales.' };
+    }
+
+    // Role-based Token Validation:
+    // Admin / Jefe de Agencia DOES NOT NEED a token ("el admin no necesita token")
+    const isAdmin = user.role === 'JEFE_AGENCIA';
+    if (!isAdmin) {
+      // Rest of users strictly require an access token issued by Admin ("para el resto de usuarios necesitan un token que solo el admin puede hacer")
+      if (!token || !token.trim()) {
+        return {
+          success: false,
+          message: 'Token de acceso requerido para asesores. Solicite su token único al Administrador / Jefe de Agencia.',
+        };
+      }
+      const expectedToken = (user.accessToken || '').trim().toUpperCase();
+      const providedToken = token.trim().toUpperCase();
+      if (expectedToken && providedToken !== expectedToken) {
+        return {
+          success: false,
+          message: 'Token de acceso inválido o expirado. Verifique con el Jefe de Agencia.',
+        };
+      }
+    }
+
+    // Successful login: reset failed attempts
+    setUsers(prev =>
+      prev.map(u => (u.id === user.id ? { ...u, failedAttempts: 0 } : u))
+    );
+    setCurrentUserState(user);
+    setIsAuthenticated(true);
+    localStorage.setItem('crediplus_is_authenticated_v1', 'true');
+    localStorage.setItem('crediplus_current_user_v1', JSON.stringify(user));
+    return { success: true };
+  };
+
+  const logout = () => {
+    setIsAuthenticated(false);
+    localStorage.setItem('crediplus_is_authenticated_v1', 'false');
+  };
+
+  const generateUserToken = (userId: string): string => {
+    const newToken = `TOK-${Math.floor(1000 + Math.random() * 9000)}`;
+    setUsers(prev =>
+      prev.map(u => {
+        if (u.id === userId) {
+          const updated = {
+            ...u,
+            accessToken: newToken,
+            updatedAt: new Date().toISOString(),
+          };
+          if (currentUser.id === userId) {
+            setCurrentUserState(updated);
+          }
+          return updated;
+        }
+        return u;
+      })
+    );
+    return newToken;
+  };
+
   // User Management (Imagen 1)
   const setCurrentUser = (user: SystemUser) => {
     setCurrentUserState(user);
   };
 
   const addUser = (newUser: SystemUser) => {
+    // If advisor and token is not set, generate token
+    if (newUser.role === 'ASESOR_PRESTAMOS' && !newUser.accessToken) {
+      newUser.accessToken = `TOK-${Math.floor(1000 + Math.random() * 9000)}`;
+    }
     setUsers(prev => [newUser, ...prev]);
   };
 
@@ -518,6 +626,9 @@ export const LoanProvider: React.FC<{ children: React.ReactNode }> = ({ children
         exchangeRate,
         displayCurrency,
         setDisplayCurrency,
+        isAuthenticated,
+        login,
+        logout,
         users,
         currentUser,
         setCurrentUser,
@@ -527,6 +638,7 @@ export const LoanProvider: React.FC<{ children: React.ReactNode }> = ({ children
         resetUserPassword,
         unlockUser,
         changeOwnPassword,
+        generateUserToken,
         clientChangeRequests,
         addClientChangeRequest,
         approveClientChangeRequest,

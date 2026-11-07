@@ -5,6 +5,7 @@ import {
   PlusCircle,
   Building2,
   Calendar,
+  LogOut,
 } from 'lucide-react';
 import { useLoanContext } from '../context/LoanContext';
 import { NavView } from './Sidebar';
@@ -25,6 +26,7 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onOpenNewLoanModal 
     users,
     currentUser,
     setCurrentUser,
+    logout,
   } = useLoanContext();
 
   const getTitle = () => {
@@ -160,6 +162,16 @@ export const Header: React.FC<HeaderProps> = ({ currentView, onOpenNewLoanModal 
             ))}
           </select>
         </div>
+
+        {/* Logout Button */}
+        <button
+          onClick={logout}
+          title="Cerrar Sesión del Sistema"
+          className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:text-red-700 hover:bg-red-50 border border-slate-200 rounded-lg transition-colors cursor-pointer"
+        >
+          <LogOut className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Salir</span>
+        </button>
 
         {/* New Loan Button */}
         <button

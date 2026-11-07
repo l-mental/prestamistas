@@ -57,16 +57,17 @@ export const initialExchangeRates: ExchangeRate = {
 export const initialUsers: SystemUser[] = [
   {
     id: 'usr-001',
-    username: 'jefe.alejandro',
+    username: 'admin',
     fullName: 'Lic. Alejandro Morales Rivera',
     role: 'JEFE_AGENCIA',
     agency: 'Agencia Central',
-    email: 'amorales@crediplus.bo',
+    email: 'admin@crediplus.bo',
     phone: '+591 2 244 5566',
     isActive: true,
     isLocked: false,
-    password: 'JefePassword2026*',
+    password: 'admin',
     createdAt: '2026-01-10',
+    // Admin no necesita token para iniciar sesión
   },
   {
     id: 'usr-002',
@@ -78,7 +79,8 @@ export const initialUsers: SystemUser[] = [
     phone: '+591 706 88210',
     isActive: true,
     isLocked: false,
-    password: 'AsesorPass2026*',
+    password: '123',
+    accessToken: 'TOK-7791', // Token generado por el Admin/Jefe
     createdAt: '2026-02-01',
   },
   {
@@ -90,8 +92,9 @@ export const initialUsers: SystemUser[] = [
     email: 'cloza@crediplus.bo',
     phone: '+591 712 33490',
     isActive: true,
-    isLocked: true, // Asesor bloqueado: solo Jefe de Agencia puede reiniciar/desbloquear
-    password: 'Temporal123*',
+    isLocked: true, // Asesor bloqueado: Jefe puede reiniciar y desbloquear
+    password: '123',
+    accessToken: 'TOK-4520',
     createdAt: '2026-03-15',
   },
 ];

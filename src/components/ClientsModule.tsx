@@ -167,15 +167,37 @@ export const ClientsModule: React.FC<ClientsModuleProps> = ({
   const [editClientData, setEditClientData] = useState<Client | null>(null);
   const [isRequestChangeModalOpen, setIsRequestChangeModalOpen] = useState(false);
 
-  // Solicitud de Cambio de Datos Generales (Imagen 2)
+  // Solicitud de Cambio de Datos Generales (Imagen 122c0cfc: 19 campos completos)
+  const [reqDocNumber, setReqDocNumber] = useState('');
+  const [reqExpedition, setReqExpedition] = useState<BolivianDepartment>('LP');
+  const [reqComplement, setReqComplement] = useState('');
   const [reqPaternal, setReqPaternal] = useState('');
   const [reqMaternal, setReqMaternal] = useState('');
   const [reqMarried, setReqMarried] = useState('');
   const [reqNames, setReqNames] = useState('');
-  const [reqDocNumber, setReqDocNumber] = useState('');
-  const [reqCivilStatus, setReqCivilStatus] = useState('');
+  const [reqDocExpDate, setReqDocExpDate] = useState('');
+  const [reqBirthDate, setReqBirthDate] = useState('');
+  const [reqGender, setReqGender] = useState<'M' | 'F'>('M');
+  const [reqCivilFromId, setReqCivilFromId] = useState('');
+  const [reqCivilDeclared, setReqCivilDeclared] = useState('');
+  const [reqDeclaredActivity, setReqDeclaredActivity] = useState('');
+  // Cónyuge
+  const [reqSpouseName, setReqSpouseName] = useState('');
+  const [reqSpouseCI, setReqSpouseCI] = useState('');
+  const [reqSpouseCaedec, setReqSpouseCaedec] = useState('');
+  const [reqSpouseActivity, setReqSpouseActivity] = useState('');
+  const [reqSpouseSeniority, setReqSpouseSeniority] = useState(12);
+  const [reqSpouseSector, setReqSpouseSector] = useState<'Comercio' | 'Servicio' | 'Producción'>('Comercio');
   const [reqReason, setReqReason] = useState('');
   const [changeSubmittedNotice, setChangeSubmittedNotice] = useState(false);
+  const [isUpdatedNotice, setIsUpdatedNotice] = useState(false);
+
+  // Submodules free modification toggles (Image 122c0cfc)
+  const [isEditingDirecciones, setIsEditingDirecciones] = useState(false);
+  const [isEditingActividad, setIsEditingActividad] = useState(false);
+  const [isEditingReferencias, setIsEditingReferencias] = useState(false);
+  const [isValidatedRecords, setIsValidatedRecords] = useState(false);
+  const [isInfoUpdated, setIsInfoUpdated] = useState(false);
 
   // Handler for Search
   const handleConsultar = (ciToSearch?: string) => {
@@ -198,92 +220,85 @@ export const ClientsModule: React.FC<ClientsModuleProps> = ({
     }
   };
 
-  // Helper to start editing
+  // Helper to start editing (Image 122c0cfc)
   const handleStartEdit = () => {
     if (!selectedClient) return;
     setEditClientData({ ...selectedClient });
-    // Preload change request modal fields
-    setReqPaternal(selectedClient.paternalLastName || '');
-    setReqMaternal(selectedClient.maternalLastName || '');
-    setReqMarried(selectedClient.marriedLastName || '');
+    // Preload all 19 fields from client
+    setReqDocNumber(selectedClient.documentNumber || '');
+    setReqExpedition(selectedClient.documentExpedition || selectedClient.ciExpedition || 'LP');
+    setReqComplement(selectedClient.documentComplement || selectedClient.ciComplement || '');
+    setReqPaternal(selectedClient.paternalLastName || selectedClient.paternalSurname || '');
+    setReqMaternal(selectedClient.maternalLastName || selectedClient.maternalSurname || '');
+    setReqMarried(selectedClient.marriedLastName || selectedClient.marriedSurname || '');
     setReqNames(selectedClient.firstName || selectedClient.fullName);
-    setReqDocNumber(selectedClient.documentNumber);
-    setReqCivilStatus(selectedClient.civilStatusDeclared || selectedClient.civilStatus || 'Casado(a)');
+    setReqDocExpDate(selectedClient.ciExpirationDate || selectedClient.idCardExpirationDate || '');
+    setReqBirthDate(selectedClient.birthDate || '');
+    setReqGender(selectedClient.gender === 'F' || selectedClient.gender === 'FEMENINO' ? 'F' : 'M');
+    setReqCivilFromId(selectedClient.civilStatusFromId || selectedClient.maritalStatusCi || 'Casado(a)');
+    setReqCivilDeclared(selectedClient.civilStatusDeclared || selectedClient.maritalStatusDeclared || selectedClient.civilStatus || 'Casado(a)');
+    setReqDeclaredActivity(selectedClient.declaredActivity || selectedClient.occupation || '');
+    // Spouse data
+    setReqSpouseName(selectedClient.spouse?.fullName || '');
+    setReqSpouseCI(selectedClient.spouse?.documentNumber || selectedClient.spouse?.ci || '');
+    setReqSpouseCaedec(selectedClient.spouse?.caedec || '');
+    setReqSpouseActivity(selectedClient.spouse?.activity || '');
+    setReqSpouseSeniority(selectedClient.spouse?.seniorityMonths || 12);
+    setReqSpouseSector((selectedClient.spouse?.sector as any) || 'Comercio');
     setReqReason('');
+    setIsEditingDirecciones(false);
+    setIsEditingActividad(false);
+    setIsEditingReferencias(false);
+    setIsValidatedRecords(false);
+    setIsInfoUpdated(false);
+    setIsUpdatedNotice(false);
     setViewMode('EDIT_MODE');
   };
 
-  // Submit Change Request for General Data (Requires Jefe de Agencia authorization)
+  // Submit Change Request for General Data (Requires Jefe de Agencia authorization - Image 122c0cfc)
   const handleSubmitChangeRequest = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editClientData) return;
 
     if (!reqReason.trim()) {
-      alert('Debe ingresar un motivo o justificación formal para solicitar la modificación de Datos Generales.');
+      alert('Debe ingresar el Motivo de la Modificación (justificación por parte del solicitante).');
       return;
     }
 
     const changedFields: ClientChangeRequest['changedFields'] = [];
 
-    if (reqPaternal !== (editClientData.paternalLastName || '')) {
-      changedFields.push({
-        fieldName: 'Apellido Paterno',
-        fieldKey: 'paternalLastName',
-        oldValue: editClientData.paternalLastName || '',
-        newValue: reqPaternal,
-        reason: reqReason,
-      });
-    }
+    // Helper comparison
+    const checkField = (name: string, key: string, oldVal: string, newVal: string) => {
+      if ((oldVal || '').trim() !== (newVal || '').trim()) {
+        changedFields.push({
+          fieldName: name,
+          fieldKey: key,
+          oldValue: oldVal || '(Vacío)',
+          newValue: newVal,
+          reason: reqReason,
+        });
+      }
+    };
 
-    if (reqMaternal !== (editClientData.maternalLastName || '')) {
-      changedFields.push({
-        fieldName: 'Apellido Materno',
-        fieldKey: 'maternalLastName',
-        oldValue: editClientData.maternalLastName || '',
-        newValue: reqMaternal,
-        reason: reqReason,
-      });
-    }
-
-    if (reqMarried !== (editClientData.marriedLastName || '')) {
-      changedFields.push({
-        fieldName: 'Apellido de Casada',
-        fieldKey: 'marriedLastName',
-        oldValue: editClientData.marriedLastName || '',
-        newValue: reqMarried,
-        reason: reqReason,
-      });
-    }
-
-    if (reqNames !== (editClientData.firstName || editClientData.fullName)) {
-      changedFields.push({
-        fieldName: 'Nombres',
-        fieldKey: 'firstName',
-        oldValue: editClientData.firstName || editClientData.fullName,
-        newValue: reqNames,
-        reason: reqReason,
-      });
-    }
-
-    if (reqDocNumber !== editClientData.documentNumber) {
-      changedFields.push({
-        fieldName: 'Cédula de Identidad',
-        fieldKey: 'documentNumber',
-        oldValue: editClientData.documentNumber,
-        newValue: reqDocNumber,
-        reason: reqReason,
-      });
-    }
-
-    if (reqCivilStatus !== (editClientData.civilStatusDeclared || '')) {
-      changedFields.push({
-        fieldName: 'Estado Civil Declarado',
-        fieldKey: 'civilStatusDeclared',
-        oldValue: editClientData.civilStatusDeclared || '',
-        newValue: reqCivilStatus,
-        reason: reqReason,
-      });
-    }
+    checkField('C.I.', 'documentNumber', editClientData.documentNumber, reqDocNumber);
+    checkField('Expedido', 'documentExpedition', editClientData.documentExpedition || editClientData.ciExpedition || 'LP', reqExpedition);
+    checkField('Alfanumérico / Complemento', 'documentComplement', editClientData.documentComplement || editClientData.ciComplement || '', reqComplement);
+    checkField('Apellido Paterno', 'paternalLastName', editClientData.paternalLastName || editClientData.paternalSurname || '', reqPaternal);
+    checkField('Apellido Materno', 'maternalLastName', editClientData.maternalLastName || editClientData.maternalSurname || '', reqMaternal);
+    checkField('Apellido de Casada', 'marriedLastName', editClientData.marriedLastName || editClientData.marriedSurname || '', reqMarried);
+    checkField('Nombres', 'firstName', editClientData.firstName || editClientData.fullName, reqNames);
+    checkField('Fecha Expiración CI', 'idCardExpirationDate', editClientData.idCardExpirationDate || editClientData.ciExpirationDate || '', reqDocExpDate);
+    checkField('Fecha Nacimiento', 'birthDate', editClientData.birthDate || '', reqBirthDate);
+    checkField('Género', 'gender', editClientData.gender || 'M', reqGender);
+    checkField('Estado Civil según CI', 'civilStatusFromId', editClientData.civilStatusFromId || editClientData.maritalStatusCi || '', reqCivilFromId);
+    checkField('Estado Civil Declarado', 'civilStatusDeclared', editClientData.civilStatusDeclared || editClientData.maritalStatusDeclared || '', reqCivilDeclared);
+    checkField('Actividad Declarada', 'declaredActivity', editClientData.declaredActivity || editClientData.occupation || '', reqDeclaredActivity);
+    checkField('Nombre Completo Cónyuge', 'spouse.fullName', editClientData.spouse?.fullName || '', reqSpouseName);
+    checkField('C.I. Cónyuge', 'spouse.documentNumber', editClientData.spouse?.documentNumber || editClientData.spouse?.ci || '', reqSpouseCI);
+    checkField('CAEDEC Cónyuge', 'spouse.caedec', editClientData.spouse?.caedec || '', reqSpouseCaedec);
+    checkField('Actividad Cónyuge', 'spouse.activity', editClientData.spouse?.activity || '', reqSpouseActivity);
+    checkField('Antigüedad Cónyuge (Meses)', 'spouse.seniorityMonths', (editClientData.spouse?.seniorityMonths || 0).toString(), reqSpouseSeniority.toString());
+    checkField('Sector Económico Cónyuge', 'spouse.sector', editClientData.spouse?.sector || editClientData.spouse?.economicSector || 'Comercio', reqSpouseSector);
 
     if (changedFields.length === 0) {
       alert('No se detectaron cambios en los campos respecto a la información actual.');
@@ -312,8 +327,9 @@ export const ClientsModule: React.FC<ClientsModuleProps> = ({
     if (!editClientData) return;
     updateClient(editClientData);
     setSelectedClient(editClientData);
-    setViewMode('FOUND');
-    alert('Información de Direcciones, Actividad Económica y Referencias actualizada correctamente.');
+    setIsInfoUpdated(true);
+    setIsUpdatedNotice(true);
+    setTimeout(() => setIsUpdatedNotice(false), 5000);
   };
 
   // Final Step 5 Wizard Handler: Habilitar Cliente
@@ -1617,300 +1633,447 @@ export const ClientsModule: React.FC<ClientsModuleProps> = ({
       {/* ============================================================== */}
       {/* FLOW C: EDIT CLIENT FICHA (Image 2 Rules)                       */}
       {/* ============================================================== */}
+      {/* ============================================================== */}
+      {/* FLOW C: EDIT CLIENT FICHA (Image 122c0cfc)                      */}
+      {/* ============================================================== */}
       {viewMode === 'EDIT_MODE' && editClientData && (
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-800 gap-3">
-            <div>
-              <span className="text-xs font-bold text-yellow-400 uppercase tracking-wider">
-                Edición de Ficha de Cliente
-              </span>
-              <h2 className="text-xl font-black text-white mt-0.5">
-                Modificación de Datos: [{editClientData.fullName}] (Cod. {editClientData.clientCode || '001'})
-              </h2>
-              <p className="text-xs text-slate-400">
-                Los submódulos 2, 3 y 4 se modifican libremente. El submódulo 1 (Datos Generales) requiere solicitud
-                y aprobación del Jefe de Agencia.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => exportClientInfoSheetPDF(editClientData, companySettings)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded text-xs font-semibold border border-slate-700"
-              >
-                <Printer className="w-3.5 h-3.5 text-blue-400" />
-                <span>IMPRIMIR FICHA DEL CLIENTE</span>
-              </button>
-              <button
-                onClick={() => setViewMode('FOUND')}
-                className="px-3 py-1.5 rounded bg-slate-800 text-slate-300 hover:text-white text-xs font-medium"
-              >
-                Volver
-              </button>
-            </div>
-          </div>
-
-          {/* Submodule 1: DATOS GENERALES (Requires Authorization) */}
-          <div className="p-4 rounded-xl border border-yellow-500/30 bg-yellow-500/5 space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-6">
+          {/* Header Banner matching Image 122c0cfc */}
+          <div className="border-b border-slate-800 pb-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
               <div>
-                <h4 className="text-sm font-bold text-yellow-300 flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-yellow-400" />
-                  1. DATOS GENERALES (¿Si Existen cambios?)
-                </h4>
-                <p className="text-xs text-slate-300">
-                  Por seguridad institucional, los cambios en C.I., Apellidos, Nombres y Estado Civil deben ser
-                  revisados y autorizados por el Jefe de Agencia.
-                </p>
+                <span className="text-[11px] font-black uppercase tracking-wider px-2.5 py-1 rounded bg-yellow-400 text-slate-950 inline-block mb-1 shadow-xs">
+                  EDICION DE FICHA DE CLIENTE
+                </span>
+                <div className="text-xs text-blue-300 font-semibold flex flex-wrap items-center gap-2 mt-1">
+                  <span>Cod. cliente Nro [{editClientData.clientCode || '001'}]</span>
+                  <span>•</span>
+                  <span>Asesor: [{editClientData.registeredBy || 'FERNANDO LIMACHI ORELLANA'}]</span>
+                  <span>-</span>
+                  <span>{editClientData.agency || 'Agencia Central'}</span>
+                </div>
               </div>
 
-              <button
-                onClick={() => setIsRequestChangeModalOpen(true)}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-yellow-400 hover:bg-yellow-500 text-slate-900 text-xs font-black shadow-sm shrink-0"
-              >
-                <Send className="w-3.5 h-3.5" />
-                <span>Solicitar Cambios</span>
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs pt-1 text-slate-300 bg-slate-950/70 p-3 rounded-lg border border-slate-800">
-              <div>
-                <span className="text-slate-500 block">Cédula:</span>
-                <strong>{editClientData.documentNumber} {editClientData.documentExpedition}</strong>
-              </div>
-              <div>
-                <span className="text-slate-500 block">Apellidos:</span>
-                <strong>{editClientData.paternalLastName} {editClientData.maternalLastName}</strong>
-              </div>
-              <div>
-                <span className="text-slate-500 block">Nombres:</span>
-                <strong>{editClientData.firstName || editClientData.fullName}</strong>
-              </div>
-              <div>
-                <span className="text-slate-500 block">Estado Civil:</span>
-                <strong>{editClientData.civilStatusDeclared || editClientData.civilStatus}</strong>
-              </div>
-            </div>
-          </div>
-
-          {/* Submodule 2: DIRECCIONES (Free modification) */}
-          <div className="p-4 rounded-xl border border-slate-800 bg-slate-950/60 space-y-3">
-            <div className="flex items-center justify-between">
-              <h4 className="text-sm font-bold text-blue-400 flex items-center gap-2">
-                <MapPin className="w-4 h-4" />
-                2. DIRECCIONES (Modificación Libre)
-              </h4>
-              <span className="text-[11px] px-2 py-0.5 rounded bg-blue-900/40 text-blue-300">
-                Acceso directo asesor
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-xs text-slate-300 mb-1">Localidad / Ciudad</label>
-                <input
-                  type="text"
-                  value={editClientData.homeAddress?.city || ''}
-                  onChange={e =>
-                    setEditClientData({
-                      ...editClientData,
-                      homeAddress: {
-                        ...(editClientData.homeAddress || {
-                          department: 'LP',
-                          city: '',
-                          street: '',
-                          number: '',
-                          zone: '',
-                          housingType: 'Propio',
-                          reference: '',
-                          phone: '',
-                        }),
-                        city: e.target.value,
-                      },
-                    })
-                  }
-                  className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-white text-xs"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-slate-300 mb-1">Zona / Barrio</label>
-                <input
-                  type="text"
-                  value={editClientData.homeAddress?.zone || ''}
-                  onChange={e =>
-                    setEditClientData({
-                      ...editClientData,
-                      homeAddress: {
-                        ...(editClientData.homeAddress || {
-                          department: 'LP',
-                          city: '',
-                          street: '',
-                          number: '',
-                          zone: '',
-                          housingType: 'Propio',
-                          reference: '',
-                          phone: '',
-                        }),
-                        zone: e.target.value,
-                      },
-                    })
-                  }
-                  className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-white text-xs"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-slate-300 mb-1">Calle / Avenida</label>
-                <input
-                  type="text"
-                  value={editClientData.homeAddress?.street || editClientData.address}
-                  onChange={e => {
-                    const newStreet = e.target.value;
-                    setEditClientData({
-                      ...editClientData,
-                      address: newStreet,
-                      homeAddress: {
-                        ...(editClientData.homeAddress || {
-                          department: 'LP',
-                          city: '',
-                          street: '',
-                          number: '',
-                          zone: '',
-                          housingType: 'Propio',
-                          reference: '',
-                          phone: '',
-                        }),
-                        street: newStreet,
-                      },
-                    });
-                  }}
-                  className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-white text-xs"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Submodule 3: ACTIVIDAD ECONÓMICA (Free modification) */}
-          <div className="p-4 rounded-xl border border-slate-800 bg-slate-950/60 space-y-3">
-            <div className="flex items-center justify-between">
-              <h4 className="text-sm font-bold text-blue-400 flex items-center gap-2">
-                <Briefcase className="w-4 h-4" />
-                3. ACTIVIDAD ECONÓMICA (Modificación Libre)
-              </h4>
-              <span className="text-[11px] px-2 py-0.5 rounded bg-blue-900/40 text-blue-300">
-                Acceso directo asesor
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-xs text-slate-300 mb-1">CAEDEC</label>
-                <select
-                  value={editClientData.caedecCode || 'G4711'}
-                  onChange={e =>
-                    setEditClientData({
-                      ...editClientData,
-                      caedecCode: e.target.value,
-                    })
-                  }
-                  className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-white text-xs"
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('FOUND')}
+                  className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold border border-slate-700 transition-colors"
                 >
-                  {CAEDEC_OPTIONS.map(opt => (
-                    <option key={opt.code} value={opt.code}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
+                  Volver a Consulta
+                </button>
               </div>
-              <div className="md:col-span-2">
-                <label className="block text-xs text-slate-300 mb-1">Descripción de Actividad</label>
-                <input
-                  type="text"
-                  value={editClientData.activityDescription || editClientData.declaredActivity || ''}
-                  onChange={e =>
-                    setEditClientData({
-                      ...editClientData,
-                      activityDescription: e.target.value,
-                      declaredActivity: e.target.value,
-                    })
-                  }
-                  className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-white text-xs"
-                />
+            </div>
+
+            {/* Client summary box */}
+            <div className="bg-slate-950/80 border border-blue-900/40 rounded-xl p-3.5 space-y-1">
+              <h3 className="text-base font-black text-white">
+                Sr(a). [{editClientData.fullName}]
+              </h3>
+              <div className="text-xs text-slate-300 flex flex-wrap items-center gap-x-4 gap-y-1">
+                <span>
+                  <strong className="text-yellow-400">C.I.:</strong> {editClientData.documentNumber}{' '}
+                  {editClientData.documentExpedition || editClientData.ciExpedition}
+                </span>
+                <span>
+                  <strong className="text-yellow-400">Estado Civil:</strong>{' '}
+                  {editClientData.civilStatusDeclared || editClientData.maritalStatusDeclared || editClientData.civilStatus || 'Soltero(a)'}
+                </span>
+                <span>
+                  <strong className="text-yellow-400">Domicilio:</strong> {editClientData.address}
+                </span>
+                <span>
+                  <strong className="text-yellow-400">Actividad:</strong>{' '}
+                  {editClientData.activityDescription || editClientData.declaredActivity || editClientData.occupation || 'Comercial'}
+                </span>
               </div>
             </div>
           </div>
 
-          {/* Submodule 4: REFERENCIAS (Free modification) */}
-          <div className="p-4 rounded-xl border border-slate-800 bg-slate-950/60 space-y-3">
-            <div className="flex items-center justify-between">
-              <h4 className="text-sm font-bold text-blue-400 flex items-center gap-2">
-                <Users className="w-4 h-4" />
-                4. REFERENCIAS PERSONALES (Modificación Libre)
-              </h4>
-              <span className="text-[11px] px-2 py-0.5 rounded bg-blue-900/40 text-blue-300">
-                Acceso directo asesor
-              </span>
+          {/* 5 Submodules Table (Exact format from Image 122c0cfc) */}
+          <div className="border border-slate-800 rounded-xl overflow-hidden shadow-sm">
+            <div className="grid grid-cols-1 md:grid-cols-12 bg-blue-900/60 text-white font-bold text-xs border-b border-blue-800 py-2.5 px-4">
+              <div className="md:col-span-8 uppercase tracking-wider">Sub Módulos</div>
+              <div className="md:col-span-4 uppercase tracking-wider text-right md:text-center">¿Si Existen cambios?</div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {(editClientData.personalReferences || []).map((ref, idx) => (
-                <div key={idx} className="p-3 bg-slate-900 rounded border border-slate-800 space-y-2">
-                  <span className="text-[11px] font-bold text-yellow-400">Referencia #{idx + 1}</span>
-                  <input
-                    type="text"
-                    value={ref.name}
-                    onChange={e => {
-                      const newRefs = [...(editClientData.personalReferences || [])];
-                      newRefs[idx] = { ...newRefs[idx], name: e.target.value };
-                      setEditClientData({ ...editClientData, personalReferences: newRefs });
-                    }}
-                    placeholder="Nombre completo"
-                    className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-white text-xs"
-                  />
-                  <div className="grid grid-cols-2 gap-2">
+            {/* Submódulo 1: DATOS GENERALES */}
+            <div className="border-b border-slate-800/80 bg-slate-900/50 p-4 transition-colors hover:bg-slate-800/20">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+                <div className="md:col-span-8 space-y-1">
+                  <h4 className="text-sm font-black text-yellow-400 flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-yellow-400" />
+                    Sub Módulo 1: DATOS GENERALES
+                  </h4>
+                  <p className="text-xs text-slate-300 italic">
+                    si no existe modificacion con la informacion insertada en este Modulo ir a Boton SIGUIENTE y seguir al sub modulo...
+                  </p>
+                  <p className="text-[11px] text-slate-400">
+                    (C.I., Apellidos, Nombres, Fecha de Nacimiento y Estado Civil requieren autorización del Jefe de Agencia)
+                  </p>
+                </div>
+                <div className="md:col-span-4 flex justify-start md:justify-center">
+                  <button
+                    type="button"
+                    onClick={() => setIsRequestChangeModalOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-5 py-2.5 bg-yellow-400 hover:bg-yellow-500 text-slate-950 font-black rounded-lg text-xs shadow-md transition-all active:scale-95 cursor-pointer"
+                  >
+                    <Send className="w-3.5 h-3.5 text-slate-950" />
+                    <span>Solicitar Cambios</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Submódulo 2: DIRECCIONES */}
+            <div className="border-b border-slate-800/80 bg-slate-900/50 p-4 transition-colors hover:bg-slate-800/20">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+                <div className="md:col-span-8 space-y-1">
+                  <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-blue-400" />
+                    Sub Módulo 2: DIRECCIONES
+                  </h4>
+                  <p className="text-xs text-slate-300 italic">
+                    si no existe modificacion con la informacion insertada en este Modulo ir a Boton SIGUIENTE y seguir al sub modulo...
+                  </p>
+                  <p className="text-[11px] text-blue-300">
+                    Domicilio actual: {editClientData.homeAddress?.street || editClientData.address} - Zona: {editClientData.homeAddress?.zone || 'Central'} ({editClientData.homeAddress?.city || 'La Paz'})
+                  </p>
+                </div>
+                <div className="md:col-span-4 flex justify-start md:justify-center">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingDirecciones(!isEditingDirecciones)}
+                    className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
+                      isEditingDirecciones
+                        ? 'bg-blue-600 text-white border-blue-500 shadow-sm'
+                        : 'bg-slate-800 text-blue-300 hover:bg-slate-700 border-slate-700'
+                    }`}
+                  >
+                    <span>Modificar libremente</span>
+                    <span className="text-[10px]">{isEditingDirecciones ? '▲ Cerrar' : '▼ Editar'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Collapsible edit form for DIRECCIONES */}
+              {isEditingDirecciones && (
+                <div className="mt-4 pt-4 border-t border-slate-800 grid grid-cols-1 md:grid-cols-3 gap-3 bg-slate-950/60 p-3.5 rounded-xl">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">Localidad / Ciudad</label>
                     <input
                       type="text"
-                      value={ref.relationship}
-                      onChange={e => {
-                        const newRefs = [...(editClientData.personalReferences || [])];
-                        newRefs[idx] = { ...newRefs[idx], relationship: e.target.value };
-                        setEditClientData({ ...editClientData, personalReferences: newRefs });
-                      }}
-                      placeholder="Relación"
-                      className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-white text-xs"
+                      value={editClientData.homeAddress?.city || ''}
+                      onChange={e =>
+                        setEditClientData({
+                          ...editClientData,
+                          homeAddress: {
+                            ...(editClientData.homeAddress || {
+                              department: 'LP',
+                              city: '',
+                              street: '',
+                              number: '',
+                              zone: '',
+                              housingType: 'Propio',
+                              reference: '',
+                              phone: '',
+                            }),
+                            city: e.target.value,
+                          },
+                        })
+                      }
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white text-xs focus:border-yellow-400"
                     />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">Zona / Barrio</label>
                     <input
                       type="text"
-                      value={ref.phone}
+                      value={editClientData.homeAddress?.zone || ''}
+                      onChange={e =>
+                        setEditClientData({
+                          ...editClientData,
+                          homeAddress: {
+                            ...(editClientData.homeAddress || {
+                              department: 'LP',
+                              city: '',
+                              street: '',
+                              number: '',
+                              zone: '',
+                              housingType: 'Propio',
+                              reference: '',
+                              phone: '',
+                            }),
+                            zone: e.target.value,
+                          },
+                        })
+                      }
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white text-xs focus:border-yellow-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">Calle / Avenida y Número</label>
+                    <input
+                      type="text"
+                      value={editClientData.homeAddress?.street || editClientData.address}
                       onChange={e => {
-                        const newRefs = [...(editClientData.personalReferences || [])];
-                        newRefs[idx] = { ...newRefs[idx], phone: e.target.value };
-                        setEditClientData({ ...editClientData, personalReferences: newRefs });
+                        const newStreet = e.target.value;
+                        setEditClientData({
+                          ...editClientData,
+                          address: newStreet,
+                          homeAddress: {
+                            ...(editClientData.homeAddress || {
+                              department: 'LP',
+                              city: '',
+                              street: '',
+                              number: '',
+                              zone: '',
+                              housingType: 'Propio',
+                              reference: '',
+                              phone: '',
+                            }),
+                            street: newStreet,
+                          },
+                        });
                       }}
-                      placeholder="Celular"
-                      className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-white text-xs"
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white text-xs focus:border-yellow-400"
                     />
                   </div>
                 </div>
-              ))}
+              )}
+            </div>
+
+            {/* Submódulo 3: ACTIVIDAD ECONÓMICA */}
+            <div className="border-b border-slate-800/80 bg-slate-900/50 p-4 transition-colors hover:bg-slate-800/20">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+                <div className="md:col-span-8 space-y-1">
+                  <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                    <Briefcase className="w-4 h-4 text-blue-400" />
+                    Sub Módulo 3: ACTIVIDAD ECONOMICA
+                  </h4>
+                  <p className="text-xs text-slate-300 italic">
+                    si no existe modificacion con la informacion insertada en este Modulo ir a Boton SIGUIENTE y seguir al sub modulo...
+                  </p>
+                  <p className="text-[11px] text-blue-300">
+                    Actividad: {editClientData.activityDescription || editClientData.declaredActivity} (CAEDEC: {editClientData.caedecCode || '51329 - Comercio'})
+                  </p>
+                </div>
+                <div className="md:col-span-4 flex justify-start md:justify-center">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingActividad(!isEditingActividad)}
+                    className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
+                      isEditingActividad
+                        ? 'bg-blue-600 text-white border-blue-500 shadow-sm'
+                        : 'bg-slate-800 text-blue-300 hover:bg-slate-700 border-slate-700'
+                    }`}
+                  >
+                    <span>Modificar libremente</span>
+                    <span className="text-[10px]">{isEditingActividad ? '▲ Cerrar' : '▼ Editar'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Collapsible edit form for ACTIVIDAD ECONÓMICA */}
+              {isEditingActividad && (
+                <div className="mt-4 pt-4 border-t border-slate-800 grid grid-cols-1 md:grid-cols-3 gap-3 bg-slate-950/60 p-3.5 rounded-xl">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-300 mb-1">Código CAEDEC</label>
+                    <select
+                      value={editClientData.caedecCode || '51329'}
+                      onChange={e =>
+                        setEditClientData({
+                          ...editClientData,
+                          caedecCode: e.target.value,
+                        })
+                      }
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white text-xs focus:border-yellow-400"
+                    >
+                      {CAEDEC_OPTIONS.map(opt => (
+                        <option key={opt.code} value={opt.code}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-bold text-slate-300 mb-1">Descripción de Actividad</label>
+                    <input
+                      type="text"
+                      value={editClientData.activityDescription || editClientData.declaredActivity || ''}
+                      onChange={e =>
+                        setEditClientData({
+                          ...editClientData,
+                          activityDescription: e.target.value,
+                          declaredActivity: e.target.value,
+                        })
+                      }
+                      className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white text-xs focus:border-yellow-400"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Submódulo 4: REFERENCIAS */}
+            <div className="border-b border-slate-800/80 bg-slate-900/50 p-4 transition-colors hover:bg-slate-800/20">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+                <div className="md:col-span-8 space-y-1">
+                  <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                    <Users className="w-4 h-4 text-blue-400" />
+                    Sub Módulo 4: REFERENCIAS
+                  </h4>
+                  <p className="text-xs text-slate-300 italic">
+                    si no existe modificacion con la informacion insertada en este Modulo ir a Boton SIGUIENTE y seguir al sub modulo...
+                  </p>
+                  <p className="text-[11px] text-blue-300">
+                    {(editClientData.personalReferences || []).length} referencia(s) registrada(s) actualmente
+                  </p>
+                </div>
+                <div className="md:col-span-4 flex justify-start md:justify-center">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingReferencias(!isEditingReferencias)}
+                    className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
+                      isEditingReferencias
+                        ? 'bg-blue-600 text-white border-blue-500 shadow-sm'
+                        : 'bg-slate-800 text-blue-300 hover:bg-slate-700 border-slate-700'
+                    }`}
+                  >
+                    <span>Modificar libremente</span>
+                    <span className="text-[10px]">{isEditingReferencias ? '▲ Cerrar' : '▼ Editar'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Collapsible edit form for REFERENCIAS */}
+              {isEditingReferencias && (
+                <div className="mt-4 pt-4 border-t border-slate-800 grid grid-cols-1 md:grid-cols-2 gap-3 bg-slate-950/60 p-3.5 rounded-xl">
+                  {(editClientData.personalReferences || []).map((ref, idx) => (
+                    <div key={idx} className="p-3 bg-slate-900 rounded-lg border border-slate-800 space-y-2">
+                      <span className="text-[11px] font-bold text-yellow-400">Referencia #{idx + 1}</span>
+                      <input
+                        type="text"
+                        value={ref.name}
+                        onChange={e => {
+                          const newRefs = [...(editClientData.personalReferences || [])];
+                          newRefs[idx] = { ...newRefs[idx], name: e.target.value };
+                          setEditClientData({ ...editClientData, personalReferences: newRefs });
+                        }}
+                        placeholder="Nombre completo"
+                        className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-white text-xs focus:border-yellow-400"
+                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          value={ref.relationship}
+                          onChange={e => {
+                            const newRefs = [...(editClientData.personalReferences || [])];
+                            newRefs[idx] = { ...newRefs[idx], relationship: e.target.value };
+                            setEditClientData({ ...editClientData, personalReferences: newRefs });
+                          }}
+                          placeholder="Relación"
+                          className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-white text-xs focus:border-yellow-400"
+                        />
+                        <input
+                          type="text"
+                          value={ref.phone}
+                          onChange={e => {
+                            const newRefs = [...(editClientData.personalReferences || [])];
+                            newRefs[idx] = { ...newRefs[idx], phone: e.target.value };
+                            setEditClientData({ ...editClientData, personalReferences: newRefs });
+                          }}
+                          placeholder="Celular"
+                          className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-white text-xs focus:border-yellow-400"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Submódulo 5: VALIDACION DE REGISTROS */}
+            <div className="bg-slate-900/50 p-4 transition-colors hover:bg-slate-800/20">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+                <div className="md:col-span-8 space-y-1">
+                  <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    Sub Módulo 5: VALIDACION DE REGISTROS
+                  </h4>
+                  <p className="text-xs text-slate-300 italic">
+                    si no existe modificacion con la informacion insertada en este Modulo ir a Boton SIGUIENTE y confirmar datos...
+                  </p>
+                  <p className="text-[11px] text-slate-400">
+                    Verificación integral de consistencia crediticia y expediente KYC.
+                  </p>
+                </div>
+                <div className="md:col-span-4 flex justify-start md:justify-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsValidatedRecords(true);
+                    }}
+                    className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
+                      isValidatedRecords
+                        ? 'bg-emerald-600 text-white border-emerald-500 shadow-sm'
+                        : 'bg-slate-800 text-emerald-300 hover:bg-slate-700 border-slate-700'
+                    }`}
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    <span>{isValidatedRecords ? '✓ Registros Confirmados' : 'Confirmar y Validar'}</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Save Action for Submodules 2, 3, 4 */}
-          <div className="pt-4 flex justify-between items-center border-t border-slate-800">
-            <button
-              onClick={() => setViewMode('FOUND')}
-              className="px-4 py-2 rounded-lg bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-slate-700"
-            >
-              Cancelar
-            </button>
+          {/* Bottom notices and action buttons from Image 122c0cfc */}
+          <div className="pt-4 border-t border-slate-800 space-y-4">
+            {isUpdatedNotice && (
+              <div className="p-3 bg-emerald-500/15 border border-emerald-500/40 rounded-xl flex items-center gap-2.5 text-xs text-emerald-300 font-semibold">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Información del cliente actualizada exitosamente. El botón de impresión está activo.</span>
+              </div>
+            )}
 
-            <button
-              onClick={handleSavePermittedEdits}
-              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg bg-yellow-400 hover:bg-yellow-500 text-slate-900 text-sm font-black shadow-md transition-transform active:scale-95"
-            >
-              <Check className="w-4 h-4" />
-              <span>ACTUALIZAR INFORMACIÓN</span>
-            </button>
+            {/* Notice 1 */}
+            <div className="text-center">
+              <p className="text-xs text-yellow-300/90 font-medium italic">
+                (Una vez se muestre todos los datos confirmados en pantalla se habilitara el Boton de Actualizar Ficha de ACTUALIZAR INFORMACION)
+              </p>
+            </div>
+
+            {/* Button 1: ACTUALIZAR INFORMACION */}
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={handleSavePermittedEdits}
+                className="w-full sm:w-auto min-w-[280px] flex items-center justify-center gap-2 bg-yellow-400 hover:bg-yellow-500 text-slate-950 font-black px-8 py-3 rounded-xl text-sm shadow-xl shadow-yellow-500/20 transition-all active:scale-98 cursor-pointer"
+              >
+                <Check className="w-4 h-4 text-slate-950" />
+                <span>ACTUALIZAR INFORMACION</span>
+              </button>
+            </div>
+
+            {/* Notice 2 */}
+            <div className="text-center pt-2">
+              <p className="text-xs text-slate-400 font-medium">
+                Una vez actualizado se habilitara el boton de Impresión de ficha
+              </p>
+            </div>
+
+            {/* Button 2: IMPRIMIR FICHA DEL CLIENTE */}
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={() => exportClientInfoSheetPDF(editClientData, companySettings)}
+                className="w-full sm:w-auto min-w-[280px] flex items-center justify-center gap-2 bg-yellow-400 hover:bg-yellow-500 text-slate-950 font-black px-8 py-3 rounded-xl text-sm shadow-xl shadow-yellow-500/20 transition-all active:scale-98 cursor-pointer"
+              >
+                <Printer className="w-4 h-4 text-slate-950" />
+                <span>IMPRIMIR FICHA DEL CLIENTE</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1954,46 +2117,11 @@ export const ClientsModule: React.FC<ClientsModuleProps> = ({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800 text-slate-300">
+                    {/* 1. C.I. */}
                     <tr>
-                      <td className="p-3 font-semibold text-white">Apellido Paterno</td>
-                      <td className="p-3 text-slate-400">{editClientData.paternalLastName || '-'}</td>
-                      <td className="p-3">
-                        <input
-                          type="text"
-                          value={reqPaternal}
-                          onChange={e => setReqPaternal(e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-white text-xs focus:border-yellow-400"
-                        />
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="p-3 font-semibold text-white">Apellido Materno</td>
-                      <td className="p-3 text-slate-400">{editClientData.maternalLastName || '-'}</td>
-                      <td className="p-3">
-                        <input
-                          type="text"
-                          value={reqMaternal}
-                          onChange={e => setReqMaternal(e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-white text-xs focus:border-yellow-400"
-                        />
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="p-3 font-semibold text-white">Nombres</td>
-                      <td className="p-3 text-slate-400">{editClientData.firstName || editClientData.fullName}</td>
-                      <td className="p-3">
-                        <input
-                          type="text"
-                          value={reqNames}
-                          onChange={e => setReqNames(e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-white text-xs focus:border-yellow-400"
-                        />
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="p-3 font-semibold text-white">Cédula de Identidad</td>
-                      <td className="p-3 text-slate-400">{editClientData.documentNumber}</td>
-                      <td className="p-3">
+                      <td className="p-2.5 font-bold text-white">1. C.I.</td>
+                      <td className="p-2.5 text-slate-400">{editClientData.documentNumber}</td>
+                      <td className="p-2.5">
                         <input
                           type="text"
                           value={reqDocNumber}
@@ -2002,22 +2130,282 @@ export const ClientsModule: React.FC<ClientsModuleProps> = ({
                         />
                       </td>
                     </tr>
+
+                    {/* 2. Expedido */}
                     <tr>
-                      <td className="p-3 font-semibold text-white">Estado Civil</td>
-                      <td className="p-3 text-slate-400">
-                        {editClientData.civilStatusDeclared || editClientData.civilStatus}
-                      </td>
-                      <td className="p-3">
+                      <td className="p-2.5 font-bold text-white">2. Expedido</td>
+                      <td className="p-2.5 text-slate-400">{editClientData.documentExpedition || editClientData.ciExpedition || 'LP'}</td>
+                      <td className="p-2.5">
                         <select
-                          value={reqCivilStatus}
-                          onChange={e => setReqCivilStatus(e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-white text-xs"
+                          value={reqExpedition}
+                          onChange={e => setReqExpedition(e.target.value as BolivianDepartment)}
+                          className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-white text-xs focus:border-yellow-400"
+                        >
+                          {BOLIVIAN_DEPARTMENTS.map(d => (
+                            <option key={d.code} value={d.code}>
+                              {d.name}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                    </tr>
+
+                    {/* 3. Alfanumérico */}
+                    <tr>
+                      <td className="p-2.5 font-bold text-white">3. Alfanumérico</td>
+                      <td className="p-2.5 text-slate-400">{editClientData.documentComplement || editClientData.ciComplement || '(Ninguno)'}</td>
+                      <td className="p-2.5">
+                        <input
+                          type="text"
+                          value={reqComplement}
+                          onChange={e => setReqComplement(e.target.value)}
+                          placeholder="Ej: 1A"
+                          className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-white text-xs focus:border-yellow-400"
+                        />
+                      </td>
+                    </tr>
+
+                    {/* 4. APELLIDO PATERNO */}
+                    <tr>
+                      <td className="p-2.5 font-bold text-white">4. APELLIDO PATERNO</td>
+                      <td className="p-2.5 text-slate-400">{editClientData.paternalLastName || editClientData.paternalSurname || '-'}</td>
+                      <td className="p-2.5">
+                        <input
+                          type="text"
+                          value={reqPaternal}
+                          onChange={e => setReqPaternal(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-white text-xs focus:border-yellow-400"
+                        />
+                      </td>
+                    </tr>
+
+                    {/* 5. APELLIDO MATERNO */}
+                    <tr>
+                      <td className="p-2.5 font-bold text-white">5. APELLIDO MATERNO</td>
+                      <td className="p-2.5 text-slate-400">{editClientData.maternalLastName || editClientData.maternalSurname || '-'}</td>
+                      <td className="p-2.5">
+                        <input
+                          type="text"
+                          value={reqMaternal}
+                          onChange={e => setReqMaternal(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-white text-xs focus:border-yellow-400"
+                        />
+                      </td>
+                    </tr>
+
+                    {/* 6. APELLIDO DE CASADA */}
+                    <tr>
+                      <td className="p-2.5 font-bold text-white">6. APELLIDO DE CASADA</td>
+                      <td className="p-2.5 text-slate-400">{editClientData.marriedLastName || editClientData.marriedSurname || '(Ninguno)'}</td>
+                      <td className="p-2.5">
+                        <input
+                          type="text"
+                          value={reqMarried}
+                          onChange={e => setReqMarried(e.target.value)}
+                          placeholder="De ..."
+                          className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-white text-xs focus:border-yellow-400"
+                        />
+                      </td>
+                    </tr>
+
+                    {/* 7. NOMBRE */}
+                    <tr>
+                      <td className="p-2.5 font-bold text-white">7. NOMBRE</td>
+                      <td className="p-2.5 text-slate-400">{editClientData.firstName || editClientData.fullName}</td>
+                      <td className="p-2.5">
+                        <input
+                          type="text"
+                          value={reqNames}
+                          onChange={e => setReqNames(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-white text-xs focus:border-yellow-400"
+                        />
+                      </td>
+                    </tr>
+
+                    {/* 8. FECHA DE EXPIRACION CI */}
+                    <tr>
+                      <td className="p-2.5 font-bold text-white">8. FECHA DE EXPIRACION CI</td>
+                      <td className="p-2.5 text-slate-400">{editClientData.idCardExpirationDate || editClientData.ciExpirationDate || '-'}</td>
+                      <td className="p-2.5">
+                        <input
+                          type="date"
+                          value={reqDocExpDate}
+                          onChange={e => setReqDocExpDate(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-white text-xs focus:border-yellow-400"
+                        />
+                      </td>
+                    </tr>
+
+                    {/* 9. FECHA DE NACIMIENTO */}
+                    <tr>
+                      <td className="p-2.5 font-bold text-white">9. FECHA DE NACIMIENTO</td>
+                      <td className="p-2.5 text-slate-400">{editClientData.birthDate || '-'}</td>
+                      <td className="p-2.5">
+                        <input
+                          type="date"
+                          value={reqBirthDate}
+                          onChange={e => setReqBirthDate(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-white text-xs focus:border-yellow-400"
+                        />
+                      </td>
+                    </tr>
+
+                    {/* 10. GENERO */}
+                    <tr>
+                      <td className="p-2.5 font-bold text-white">10. GENERO</td>
+                      <td className="p-2.5 text-slate-400">{editClientData.gender === 'F' || editClientData.gender === 'FEMENINO' ? 'Femenino' : 'Masculino'}</td>
+                      <td className="p-2.5">
+                        <select
+                          value={reqGender}
+                          onChange={e => setReqGender(e.target.value as 'M' | 'F')}
+                          className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-white text-xs focus:border-yellow-400"
+                        >
+                          <option value="M">Masculino</option>
+                          <option value="F">Femenino</option>
+                        </select>
+                      </td>
+                    </tr>
+
+                    {/* 11. ESTADO CIVIL DOCUMENTO DE IDENTIDAD */}
+                    <tr>
+                      <td className="p-2.5 font-bold text-white">11. ESTADO CIVIL SEGÚN C.I.</td>
+                      <td className="p-2.5 text-slate-400">{editClientData.civilStatusFromId || editClientData.maritalStatusCi || '-'}</td>
+                      <td className="p-2.5">
+                        <select
+                          value={reqCivilFromId}
+                          onChange={e => setReqCivilFromId(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-white text-xs focus:border-yellow-400"
                         >
                           <option value="Soltero(a)">Soltero(a)</option>
                           <option value="Casado(a)">Casado(a)</option>
                           <option value="Divorciado(a)">Divorciado(a)</option>
                           <option value="Viudo(a)">Viudo(a)</option>
                           <option value="Conviviente">Conviviente</option>
+                        </select>
+                      </td>
+                    </tr>
+
+                    {/* 12. ESTADO CIVIL DECLARADO POR CLIENTE */}
+                    <tr>
+                      <td className="p-2.5 font-bold text-white">12. ESTADO CIVIL DECLARADO</td>
+                      <td className="p-2.5 text-slate-400">{editClientData.civilStatusDeclared || editClientData.maritalStatusDeclared || editClientData.civilStatus || '-'}</td>
+                      <td className="p-2.5">
+                        <select
+                          value={reqCivilDeclared}
+                          onChange={e => setReqCivilDeclared(e.target.value)}
+                          className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-white text-xs focus:border-yellow-400 font-semibold"
+                        >
+                          <option value="Soltero(a)">Soltero(a)</option>
+                          <option value="Casado(a)">Casado(a)</option>
+                          <option value="Divorciado(a)">Divorciado(a)</option>
+                          <option value="Viudo(a)">Viudo(a)</option>
+                          <option value="Conviviente">Conviviente</option>
+                        </select>
+                      </td>
+                    </tr>
+
+                    {/* 13. ACTIVIDAD DECLARADA POR EL CLIENTE */}
+                    <tr>
+                      <td className="p-2.5 font-bold text-white">13. ACTIVIDAD DECLARADA</td>
+                      <td className="p-2.5 text-slate-400">{editClientData.declaredActivity || editClientData.occupation || '-'}</td>
+                      <td className="p-2.5">
+                        <input
+                          type="text"
+                          value={reqDeclaredActivity}
+                          onChange={e => setReqDeclaredActivity(e.target.value)}
+                          placeholder="Ej: Comerciante Minorista"
+                          className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-white text-xs focus:border-yellow-400"
+                        />
+                      </td>
+                    </tr>
+
+                    {/* 14. Nombre completo Cónyuge */}
+                    <tr>
+                      <td className="p-2.5 font-bold text-white">14. Nombre Completo Cónyuge</td>
+                      <td className="p-2.5 text-slate-400">{editClientData.spouse?.fullName || '(No aplica / Vacío)'}</td>
+                      <td className="p-2.5">
+                        <input
+                          type="text"
+                          value={reqSpouseName}
+                          onChange={e => setReqSpouseName(e.target.value)}
+                          placeholder="Nombres y Apellidos"
+                          className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-white text-xs focus:border-yellow-400"
+                        />
+                      </td>
+                    </tr>
+
+                    {/* 15. C.I. Cónyuge */}
+                    <tr>
+                      <td className="p-2.5 font-bold text-white">15. C.I. Cónyuge</td>
+                      <td className="p-2.5 text-slate-400">{editClientData.spouse?.documentNumber || editClientData.spouse?.ci || '-'}</td>
+                      <td className="p-2.5">
+                        <input
+                          type="text"
+                          value={reqSpouseCI}
+                          onChange={e => setReqSpouseCI(e.target.value)}
+                          placeholder="Número de C.I."
+                          className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-white text-xs focus:border-yellow-400"
+                        />
+                      </td>
+                    </tr>
+
+                    {/* 16. CAEDEC Cónyuge */}
+                    <tr>
+                      <td className="p-2.5 font-bold text-white">16. CAEDEC Cónyuge</td>
+                      <td className="p-2.5 text-slate-400">{editClientData.spouse?.caedec || '-'}</td>
+                      <td className="p-2.5">
+                        <input
+                          type="text"
+                          value={reqSpouseCaedec}
+                          onChange={e => setReqSpouseCaedec(e.target.value)}
+                          placeholder="Ej: G4711"
+                          className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-white text-xs focus:border-yellow-400"
+                        />
+                      </td>
+                    </tr>
+
+                    {/* 17. Actividad Cónyuge */}
+                    <tr>
+                      <td className="p-2.5 font-bold text-white">17. Actividad Cónyuge</td>
+                      <td className="p-2.5 text-slate-400">{editClientData.spouse?.activity || '-'}</td>
+                      <td className="p-2.5">
+                        <input
+                          type="text"
+                          value={reqSpouseActivity}
+                          onChange={e => setReqSpouseActivity(e.target.value)}
+                          placeholder="Ej: Empleada en comercio"
+                          className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-white text-xs focus:border-yellow-400"
+                        />
+                      </td>
+                    </tr>
+
+                    {/* 18. Antigüedad Actividad en Meses */}
+                    <tr>
+                      <td className="p-2.5 font-bold text-white">18. Antigüedad Cónyuge (Meses)</td>
+                      <td className="p-2.5 text-slate-400">{editClientData.spouse?.seniorityMonths ? `${editClientData.spouse.seniorityMonths} meses` : '-'}</td>
+                      <td className="p-2.5">
+                        <input
+                          type="number"
+                          value={reqSpouseSeniority}
+                          onChange={e => setReqSpouseSeniority(Number(e.target.value))}
+                          className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-white text-xs focus:border-yellow-400"
+                        />
+                      </td>
+                    </tr>
+
+                    {/* 19. Sector Económico Cónyuge */}
+                    <tr>
+                      <td className="p-2.5 font-bold text-white">19. Sector Económico Cónyuge</td>
+                      <td className="p-2.5 text-slate-400">{editClientData.spouse?.sector || editClientData.spouse?.economicSector || '-'}</td>
+                      <td className="p-2.5">
+                        <select
+                          value={reqSpouseSector}
+                          onChange={e => setReqSpouseSector(e.target.value as any)}
+                          className="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-white text-xs focus:border-yellow-400"
+                        >
+                          <option value="Comercio">Comercio</option>
+                          <option value="Servicio">Servicio</option>
+                          <option value="Producción">Producción</option>
                         </select>
                       </td>
                     </tr>

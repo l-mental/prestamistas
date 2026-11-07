@@ -43,6 +43,7 @@ export interface SystemUser {
   isActive?: boolean;
   isLocked: boolean; // Si el asesor se bloqueara (Jefe puede reiniciar)
   password?: string; // Contraseña
+  accessToken?: string; // Token de acceso único generado por el Jefe de Agencia/Admin
   failedAttempts?: number;
   createdAt: string;
   updatedAt?: string;
